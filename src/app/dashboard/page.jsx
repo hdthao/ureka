@@ -56,7 +56,6 @@ export default function DashboardPage() {
           >
             Dashboard
           </a>
-          <a href="#" className="nav-item disabled" tabIndex="-1">Overview</a>
           <a 
             href="#" 
             className={`nav-item ${activeTab === 'reports-builder' ? 'active' : ''}`}
@@ -64,8 +63,6 @@ export default function DashboardPage() {
           >
             Reports Builder
           </a>
-          <a href="#" className="nav-item disabled" tabIndex="-1">Domain</a>
-          <a href="#" className="nav-item disabled" tabIndex="-1">Profile</a>
         </nav>
 
         <div className="user-profile">
