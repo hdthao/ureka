@@ -68,6 +68,31 @@ async function getWebSessionCookies() {
   }
 }
 
+// Wrapper to handle automatic session cookie retry if expired or invalidated
+async function fetchWithSession(url) {
+  let cookies = await getWebSessionCookies();
+  let response = await axios.get(url, {
+    headers: { 'Cookie': cookies }
+  });
+
+  // Check if response is HTML string or missing status === true (signifying session expired or redirect to login)
+  const isInvalidResponse = typeof response.data === 'string' || (response.data && response.data.status !== true);
+  
+  if (isInvalidResponse) {
+    console.log("Session cookie expired or invalid. Re-authenticating on server...");
+    // Invalidate cached cookies and force a new login
+    cachedCookies = null;
+    cachedCookiesTime = 0;
+    cookies = await getWebSessionCookies();
+    
+    response = await axios.get(url, {
+      headers: { 'Cookie': cookies }
+    });
+  }
+  
+  return response.data;
+}
+
 export async function loginAction(email, password) {
   try {
     const response = await axios.get('https://ssp.urekamedia.com/api/auth/login', {
@@ -111,13 +136,7 @@ export async function getReportAction(token, startDate, endDate) {
 
 export async function getReportsListAction() {
   try {
-    const cookies = await getWebSessionCookies();
-    const response = await axios.get('https://ssp.urekamedia.com/auth/api/reports/reports/get_all_report_of_publisher', {
-      headers: {
-        'Cookie': cookies
-      }
-    });
-    return response.data;
+    return await fetchWithSession('https://ssp.urekamedia.com/auth/api/reports/reports/get_all_report_of_publisher');
   } catch (err) {
     console.error("Error in getReportsListAction:", err.message);
     return { status: false, error: err.message };
@@ -126,13 +145,7 @@ export async function getReportsListAction() {
 
 export async function getReportDetailsAction(reportId) {
   try {
-    const cookies = await getWebSessionCookies();
-    const response = await axios.get(`https://ssp.urekamedia.com/auth/api/reports/reports/get_report_data?id=${reportId}`, {
-      headers: {
-        'Cookie': cookies
-      }
-    });
-    return response.data;
+    return await fetchWithSession(`https://ssp.urekamedia.com/auth/api/reports/reports/get_report_data?id=${reportId}`);
   } catch (err) {
     console.error("Error in getReportDetailsAction:", err.message);
     return { status: false, error: err.message };
