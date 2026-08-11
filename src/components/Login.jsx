@@ -44,16 +44,16 @@ export default function Login() {
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
           <img src="/favicon.svg" alt="Ureka Logo" style={{ height: '48px', width: '48px', borderRadius: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
         </div>
-        <h2 className="login-title" style={{ textAlign: 'center' }}>Sign in to Ureka SSP</h2>
+        <h2 className="login-title" style={{ textAlign: 'center' }}>Sign in to Report SSP</h2>
         <p className="login-subtitle" style={{ textAlign: 'center' }}>Welcome back! Please enter your details.</p>
-        
+
         {error && <div className="login-error">{error}</div>}
-        
+
         <form onSubmit={handleLogin} className="login-form">
           <div className="form-group">
             <label>Email</label>
-            <input 
-              type="email" 
+            <input
+              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter your email"
@@ -62,15 +62,15 @@ export default function Login() {
           </div>
           <div className="form-group">
             <label>Password</label>
-            <input 
-              type="password" 
+            <input
+              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
               required
             />
           </div>
-          
+
           <button type="submit" className="login-btn" disabled={loading}>
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
