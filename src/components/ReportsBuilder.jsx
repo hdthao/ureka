@@ -203,23 +203,7 @@ export default function ReportsBuilder() {
               >
                 <ArrowLeft size={16} /> Back
               </button>
-              <button 
-                disabled 
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 16px',
-                  background: 'white',
-                  color: '#bbb',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  fontWeight: 600,
-                  cursor: 'not-allowed'
-                }}
-              >
-                <Edit3 size={16} /> Edit
-              </button>
+
               <button 
                 onClick={handleExportCSV}
                 style={{
@@ -349,7 +333,7 @@ export default function ReportsBuilder() {
                 <th style={{ width: '80px' }}>ID</th>
                 <th>Name</th>
                 <th>Date</th>
-                <th style={{ width: '220px', textAlign: 'center' }}>Actions</th>
+                <th style={{ width: '100px', textAlign: 'center' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -372,34 +356,6 @@ export default function ReportsBuilder() {
                         }}
                       >
                         View
-                      </button>
-                      <span style={{ color: '#ddd', display: 'flex', alignItems: 'center' }}>|</span>
-                      <button 
-                        disabled
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#bbb',
-                          cursor: 'not-allowed',
-                          fontWeight: 600,
-                          padding: '4px 8px'
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <span style={{ color: '#ddd', display: 'flex', alignItems: 'center' }}>|</span>
-                      <button 
-                        disabled
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#bbb',
-                          cursor: 'not-allowed',
-                          fontWeight: 600,
-                          padding: '4px 8px'
-                        }}
-                      >
-                        Delete
                       </button>
                     </span>
                   </td>
