@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Edit3, Download, RefreshCw, BarChart2 } from 'lucide-react';
+import { ArrowLeft, Download, RefreshCw, BarChart2 } from 'lucide-react';
 import { getReportsListAction, getReportDetailsAction } from '../app/actions';
 
 export default function ReportsBuilder() {
@@ -151,10 +151,13 @@ export default function ReportsBuilder() {
 
   // View 2: Detailed Report View
   if (selectedReportId !== null) {
+    const totalCols = reportDetails ? (reportDetails.report.dimensions.length + reportDetails.report.metrics.length) : 1;
+    const colWidth = `${(100 / totalCols).toFixed(2)}%`;
+
     return (
-      <div className="reports-builder-wrapper" style={{ padding: '24px 0' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>
-          <span>Reports</span> / <span style={{ fontWeight: 600, color: 'var(--color-text-main)' }}>Reports Builder</span>
+      <div className="main-content">
+        <div className="breadcrumb" style={{ marginBottom: '20px' }}>
+          Reports / <span className="active">Reports Builder</span>
         </div>
 
         {detailsLoading && (
@@ -224,18 +227,18 @@ export default function ReportsBuilder() {
             </div>
 
             <div className="chart-section" style={{ padding: '0', overflowX: 'auto' }}>
-              <table className="data-table">
+              <table className="data-table" style={{ tableLayout: 'fixed', width: '100%' }}>
                 <thead>
                   <tr>
                     {/* Render Dimensions */}
                     {reportDetails.report.dimensions.map(dim => (
-                      <th key={dim} style={{ textTransform: 'capitalize' }}>
+                      <th key={dim} style={{ width: colWidth, textTransform: 'capitalize' }}>
                         {dim === 'sites' ? 'Sites' : dim}
                       </th>
                     ))}
                     {/* Render Metrics */}
                     {reportDetails.report.metrics.map(met => (
-                      <th key={met} className="text-right" style={{ textTransform: 'capitalize' }}>
+                      <th key={met} className="text-right" style={{ width: colWidth, textTransform: 'capitalize' }}>
                         {met === 'impressions_dfp' ? 'Inventory' : met === 'pub_revenues' ? 'Publisher Revenues (USD)' : met === 'pageview' ? 'Pageview' : 'VRPM'}
                       </th>
                     ))}
@@ -246,11 +249,11 @@ export default function ReportsBuilder() {
                     <tr key={i}>
                       {/* Dimension Cells */}
                       {reportDetails.report.dimensions.map(dim => (
-                        <td key={dim}>{formatCell(dim, row[dim], row)}</td>
+                        <td key={dim} style={{ width: colWidth }}>{formatCell(dim, row[dim], row)}</td>
                       ))}
                       {/* Metric Cells */}
                       {reportDetails.report.metrics.map(met => (
-                        <td key={met} className="text-right">{formatCell(met, row[met], row)}</td>
+                        <td key={met} className="text-right" style={{ width: colWidth }}>{formatCell(met, row[met], row)}</td>
                       ))}
                     </tr>
                   ))}
@@ -259,11 +262,11 @@ export default function ReportsBuilder() {
                     <tr style={{ fontWeight: 'bold', background: '#fcfcfc', borderTop: '2px solid #eaeaea' }}>
                       {/* Dimension cells for total */}
                       {reportDetails.report.dimensions.map((dim, i) => (
-                        <td key={dim}>{i === 0 ? 'Total' : '-'}</td>
+                        <td key={dim} style={{ width: colWidth }}>{i === 0 ? 'Total' : '-'}</td>
                       ))}
                       {/* Metric cells for total */}
                       {reportDetails.report.metrics.map(met => (
-                        <td key={met} className="text-right">
+                        <td key={met} className="text-right" style={{ width: colWidth }}>
                           {formatCell(met, reportDetails.summary[met], reportDetails.summary)}
                         </td>
                       ))}
@@ -280,26 +283,9 @@ export default function ReportsBuilder() {
 
   // View 1: List of Reports
   return (
-    <div className="reports-builder-wrapper" style={{ padding: '24px 0' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>
-        <span>Reports</span> / <span style={{ fontWeight: 600, color: 'var(--color-text-main)' }}>Reports Builder</span>
-      </div>
-
-      <div style={{ marginBottom: '24px' }}>
-        <button 
-          onClick={() => alert('Chức năng Tạo báo cáo (Create report) đang được cập nhật trong phiên bản tiếp theo!')}
-          style={{
-            padding: '8px 16px',
-            background: 'var(--color-accent)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            fontWeight: 600,
-            cursor: 'pointer'
-          }}
-        >
-          Create report
-        </button>
+    <div className="main-content">
+      <div className="breadcrumb" style={{ marginBottom: '20px' }}>
+        Reports / <span className="active">Reports Builder</span>
       </div>
 
       {loading && (
@@ -327,22 +313,22 @@ export default function ReportsBuilder() {
 
       {!loading && !error && reports.length > 0 && (
         <div className="chart-section" style={{ padding: '0', overflowX: 'auto' }}>
-          <table className="data-table">
+          <table className="data-table" style={{ tableLayout: 'fixed', width: '100%' }}>
             <thead>
               <tr>
-                <th style={{ width: '80px' }}>ID</th>
-                <th>Name</th>
-                <th>Date</th>
-                <th style={{ width: '100px', textAlign: 'center' }}>Actions</th>
+                <th style={{ width: '25%' }}>ID</th>
+                <th style={{ width: '25%' }}>Name</th>
+                <th style={{ width: '25%' }}>Date</th>
+                <th style={{ width: '25%', textAlign: 'center' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {reports.map((report) => (
                 <tr key={report.id}>
-                  <td style={{ fontWeight: 600, color: 'var(--color-text-muted)' }}>{report.id}</td>
-                  <td style={{ fontWeight: 600, color: 'var(--color-text-main)' }}>{report.name}</td>
-                  <td>{formatDateField(report)}</td>
-                  <td style={{ textAlign: 'center' }}>
+                  <td style={{ width: '25%', fontWeight: 600, color: 'var(--color-text-muted)' }}>{report.id}</td>
+                  <td style={{ width: '25%', fontWeight: 600, color: 'var(--color-text-main)' }}>{report.name}</td>
+                  <td style={{ width: '25%' }}>{formatDateField(report)}</td>
+                  <td style={{ width: '25%', textAlign: 'center' }}>
                     <span style={{ display: 'flex', gap: '8px', justifyContent: 'center', fontSize: '0.9rem' }}>
                       <button 
                         onClick={() => handleView(report.id)}
