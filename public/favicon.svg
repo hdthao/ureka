@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" fill="none">
+  <defs>
+    <!-- Premium Gradient -->
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ff4081" />
+      <stop offset="50%" stop-color="#863bff" />
+      <stop offset="100%" stop-color="#2196f3" />
+    </linearGradient>
+    <linearGradient id="glowGrad" x1="0" y1="0" x2="0" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.35" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Outer Rounded Square Background for modern app look -->
+  <rect width="48" height="48" rx="12" fill="url(#bgGrad)" />
+  
+  <!-- Lightbulb Outline (Eureka / Ureka) -->
+  <path d="M24 8C16.5 8 13.5 13 13.5 18.5C13.5 23 16 26.5 18 29V34.5C18 35.8 19.2 37 20.5 37H27.5C28.8 37 30 35.8 30 34.5V29C32 26.5 34.5 23 34.5 18.5C34.5 13 31.5 8 24 8Z" 
+        stroke="url(#glowGrad)" stroke-width="2.5" stroke-linejoin="round" />
+  
+  <!-- Lightbulb Base / Thread lines -->
+  <path d="M20 40H28" stroke="url(#glowGrad)" stroke-width="2.5" stroke-linecap="round" />
+  <path d="M21.5 43H26.5" stroke="url(#glowGrad)" stroke-width="2.5" stroke-linecap="round" />
+
+  <!-- Rising Bar Chart inside the bulb (SSP / Growth / Monetization) -->
+  <rect x="18.5" y="24" width="2.5" height="5" rx="1" fill="#ffffff" />
+  <rect x="22.75" y="20" width="2.5" height="9" rx="1" fill="#ffffff" />
+  <rect x="27" y="16" width="2.5" height="13" rx="1" fill="#ffffff" />
+  
+  <!-- Rising trend line arrow crossing over the bars -->
+  <path d="M17 26.5L22.5 21L26 23.5L30.5 17" stroke="#ff4081" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M28 17H30.5V19.5" stroke="#ff4081" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+</svg>
