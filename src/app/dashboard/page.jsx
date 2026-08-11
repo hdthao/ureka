@@ -4,11 +4,13 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { User, LogOut, Menu, X } from 'lucide-react';
 import Dashboard from '../../components/Dashboard';
+import ReportsBuilder from '../../components/ReportsBuilder';
 
 export default function DashboardPage() {
   const router = useRouter();
   const [token, setToken] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('dashboard');
 
   useEffect(() => {
     const t = localStorage.getItem('ureka_token');
@@ -47,9 +49,21 @@ export default function DashboardPage() {
 
         {/* Navigation Links */}
         <nav className={`nav-links ${menuOpen ? 'open' : ''}`}>
-          <a href="#" className="nav-item active" onClick={() => setMenuOpen(false)}>Dashboard</a>
+          <a 
+            href="#" 
+            className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('dashboard'); setMenuOpen(false); }}
+          >
+            Dashboard
+          </a>
           <a href="#" className="nav-item disabled" tabIndex="-1">Overview</a>
-          <a href="#" className="nav-item disabled" tabIndex="-1">Reports Builder</a>
+          <a 
+            href="#" 
+            className={`nav-item ${activeTab === 'reports-builder' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('reports-builder'); setMenuOpen(false); }}
+          >
+            Reports Builder
+          </a>
           <a href="#" className="nav-item disabled" tabIndex="-1">Domain</a>
           <a href="#" className="nav-item disabled" tabIndex="-1">Profile</a>
         </nav>
@@ -86,7 +100,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <Dashboard />
+      {activeTab === 'dashboard' ? <Dashboard /> : <ReportsBuilder />}
     </div>
   );
 }
