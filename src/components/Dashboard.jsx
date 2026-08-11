@@ -7,7 +7,15 @@ import {
 } from 'recharts';
 import { Calendar, Globe, ChevronDown, Check, Search, X } from 'lucide-react';
 import { getReportAction } from '../app/actions';
-import { eachDayOfInterval, format, parseISO } from 'date-fns';
+import { eachDayOfInterval, format, parseISO, subDays } from 'date-fns';
+
+// Helper function to generate default date range (7 days up to today)
+const getInitialDates = () => {
+  const today = new Date();
+  const end = format(today, 'yyyy-MM-dd');
+  const start = format(subDays(today, 6), 'yyyy-MM-dd');
+  return { start, end };
+};
 
 // Component for Individual Stat Card
 const StatCard = ({ title, mainValue, subValue, change }) => (
@@ -29,13 +37,15 @@ export default function Dashboard() {
   const [error, setError] = useState(null);
   const router = useRouter();
 
+  const initialDates = useMemo(() => getInitialDates(), []);
+
   // Temp date states (bound to input values, changes instantly)
-  const [tempStartDate, setTempStartDate] = useState('2026-08-05');
-  const [tempEndDate, setTempEndDate] = useState('2026-08-11');
+  const [tempStartDate, setTempStartDate] = useState(initialDates.start);
+  const [tempEndDate, setTempEndDate] = useState(initialDates.end);
 
   // Applied date states (only changes when clicking "Apply" or on mount)
-  const [appliedStartDate, setAppliedStartDate] = useState('2026-08-05');
-  const [appliedEndDate, setAppliedEndDate] = useState('2026-08-11');
+  const [appliedStartDate, setAppliedStartDate] = useState(initialDates.start);
+  const [appliedEndDate, setAppliedEndDate] = useState(initialDates.end);
 
   // Toggle label visibility states
   const [visibleDaily, setVisibleDaily] = useState({
@@ -165,16 +175,26 @@ export default function Dashboard() {
 
   // Compute Aggregates
   const { summary, dailyData, siteData, formatData } = useMemo(() => {
-    const summary = { inventory: 0, revenues: 0, pageview: 0 };
+    let inventoryTotal = 0;
+    let revenuesTotal = 0;
+    let pageviewTotal = 0;
+
     const dailyMap = {};
     const siteMap = {};
     const formatMap = {};
+    const seenSiteDate = new Set();
 
     filteredData.forEach(item => {
-      // Summary
-      summary.inventory += item.inventory || 0;
-      summary.revenues += item.revenues || 0;
-      summary.pageview += item.pageview || 0;
+      // Summary Inventory & Revenues (sum of all adunit records)
+      inventoryTotal += item.inventory || 0;
+      revenuesTotal += item.revenues || 0;
+
+      // Summary Pageview (unique per site + date)
+      const siteDateKey = `${item.sites_name}_${item.date}`;
+      if (!seenSiteDate.has(siteDateKey)) {
+        seenSiteDate.add(siteDateKey);
+        pageviewTotal += item.pageview || 0;
+      }
 
       // Daily
       const date = item.date;
@@ -184,9 +204,14 @@ export default function Dashboard() {
 
       // Site
       const site = item.sites_name;
-      if (!siteMap[site]) siteMap[site] = { name: site, pageview: 0, 'Revenues (USD)': 0 };
-      siteMap[site].pageview += item.pageview || 0;
+      if (!siteMap[site]) {
+        siteMap[site] = { name: site, pageview: 0, 'Revenues (USD)': 0, _datesSeen: new Set() };
+      }
       siteMap[site]['Revenues (USD)'] += item.revenues || 0;
+      if (!siteMap[site]._datesSeen.has(item.date)) {
+        siteMap[site]._datesSeen.add(item.date);
+        siteMap[site].pageview += item.pageview || 0;
+      }
 
       // Format (extracted from adunits_name)
       const format = item.adunits_name ? item.adunits_name.split('_')[0] : 'Unknown';
@@ -194,6 +219,21 @@ export default function Dashboard() {
       formatMap[format]['Revenues (USD)'] += item.revenues || 0;
       formatMap[format]['Series 1'] += item.inventory || 0;
     });
+
+    // Format Pageview main value (e.g. 3.52k) and sub value (e.g. 3,518)
+    const pageviewMain = pageviewTotal >= 1000 
+      ? (pageviewTotal / 1000).toFixed(2) + 'k' 
+      : pageviewTotal.toString();
+    const pageviewSub = pageviewTotal.toLocaleString('en-US');
+
+    // Format Inventory main value (e.g. 14.73k) and sub value (e.g. 14,731)
+    const inventoryMain = inventoryTotal >= 1000 
+      ? (inventoryTotal / 1000).toFixed(2) + 'k' 
+      : inventoryTotal.toString();
+    const inventorySub = inventoryTotal.toLocaleString('en-US');
+
+    // VRPM = (Revenues / Pageview) * 1000
+    const vrpmValue = pageviewTotal > 0 ? ((revenuesTotal / pageviewTotal) * 1000).toFixed(2) : '0.00';
 
     // Populate all dates in the range with 0 if no data exists in dailyMap
     let dailyList = [];
@@ -233,11 +273,13 @@ export default function Dashboard() {
 
     return {
       summary: {
-        inventory: (summary.inventory / 1000).toFixed(2) + 'k',
-        inventoryRaw: summary.inventory,
-        revenues: summary.revenues.toFixed(2) + ' $',
-        revenuesRaw: summary.revenues.toFixed(3),
-        pageview: summary.pageview
+        inventory: inventoryMain,
+        inventoryRaw: inventorySub,
+        revenues: revenuesTotal.toFixed(1) + ' $',
+        revenuesRaw: revenuesTotal.toFixed(2),
+        pageview: pageviewMain,
+        pageviewSub: pageviewSub,
+        vrpm: vrpmValue
       },
       dailyData: dailyList,
       siteData: Object.values(siteMap),
@@ -510,13 +552,19 @@ export default function Dashboard() {
             <StatCard 
               title="Publisher's Revenues (USD)" 
               mainValue={summary.revenues} 
-              subValue={summary.revenuesRaw + "$"} 
+              subValue={summary.revenuesRaw} 
               change={0} 
             />
             <StatCard 
               title="Pageview" 
               mainValue={summary.pageview} 
-              subValue={summary.pageview} 
+              subValue={summary.pageviewSub} 
+              change={0} 
+            />
+            <StatCard 
+              title="VRPM" 
+              mainValue={summary.vrpm} 
+              subValue={summary.vrpm} 
               change={0} 
             />
           </div>
