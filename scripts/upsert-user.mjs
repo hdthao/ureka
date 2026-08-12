@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import fs from 'fs';
 import mongoose from 'mongoose';
 import User from '../src/models/User.js';
 
@@ -8,6 +9,14 @@ if (!email || !password) {
   console.error('Usage: node scripts/upsert-user.mjs <email> <password> <siteIds>');
   console.error('Example: node scripts/upsert-user.mjs user@example.com StrongPass123 106083,106095');
   process.exit(1);
+}
+
+if (!process.env.MONGODB_URI && fs.existsSync('.env')) {
+  const envText = fs.readFileSync('.env', 'utf8');
+  for (const line of envText.split(/\r?\n/)) {
+    const match = line.match(/^([^#=]+)=(.*)$/);
+    if (match) process.env[match[1].trim()] = match[2].trim();
+  }
 }
 
 if (!process.env.MONGODB_URI) {

@@ -6,7 +6,7 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import { Calendar, Globe, ChevronDown, Check, Search, X, Loader2 } from 'lucide-react';
-import { getReportAction } from '../app/actions';
+import { getAllowedSitesAction, getReportAction } from '../app/actions';
 import { eachDayOfInterval, format, parseISO, subDays } from 'date-fns';
 
 // Helper function to generate default date range (7 days up to today)
@@ -28,6 +28,7 @@ const StatCard = ({ title, mainValue, subValue, change }) => (
 
 export default function Dashboard() {
   const [data, setData] = useState([]);
+  const [allowedSites, setAllowedSites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const router = useRouter();
@@ -82,9 +83,18 @@ export default function Dashboard() {
       const apiStartDate = startStr.replace(/-/g, '/');
       const apiEndDate = endStr.replace(/-/g, '/');
 
-      const res = await getReportAction(token, apiStartDate, apiEndDate);
+      const [sitesRes, res] = await Promise.all([
+        getAllowedSitesAction(),
+        getReportAction(token, apiStartDate, apiEndDate)
+      ]);
+
+      const allowedSiteNames = sitesRes?.status
+        ? sitesRes.sites.map(site => site.name)
+        : [];
+      setAllowedSites(allowedSiteNames);
+
       if (res && res.data) {
-        setData(res.data);
+        setData(res.data.filter(item => allowedSiteNames.includes(item.sites_name)));
       } else {
         setData([]);
       }
@@ -105,6 +115,10 @@ export default function Dashboard() {
 
   // Extract all unique sites from raw data
   const allSites = useMemo(() => {
+    if (allowedSites.length > 0) {
+      return allowedSites;
+    }
+
     const sites = new Set();
     data.forEach(item => {
       if (item.sites_name) {
@@ -112,7 +126,7 @@ export default function Dashboard() {
       }
     });
     return Array.from(sites).sort();
-  }, [data]);
+  }, [allowedSites, data]);
 
   // Sync selectedSites with allSites on data fetch
   useEffect(() => {
