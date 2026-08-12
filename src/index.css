@@ -287,6 +287,18 @@ body {
   background-color: rgba(0,0,0,0.02);
 }
 
+.report-details-table th,
+.report-details-table td {
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+.report-details-table .truncate-cell {
+  max-width: 0;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .text-right {
   text-align: right !important;
 }

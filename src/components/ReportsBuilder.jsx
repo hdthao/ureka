@@ -651,6 +651,7 @@ export default function ReportsBuilder() {
   if (viewMode === 'details') {
     const totalCols = reportDetails ? (reportDetails.report.dimensions.length + reportDetails.report.metrics.length) : 1;
     const colWidth = `${(100 / totalCols).toFixed(2)}%`;
+    const tableMinWidth = `${Math.max(totalCols * 140, 720)}px`;
 
     return (
       <div className="main-content">
@@ -724,8 +725,8 @@ export default function ReportsBuilder() {
               </button>
             </div>
 
-            <div className="chart-section" style={{ padding: '0', overflowX: 'auto' }}>
-              <table className="data-table" style={{ tableLayout: 'fixed', width: '100%' }}>
+            <div className="chart-section report-details-table-wrap" style={{ padding: '0', overflowX: 'auto' }}>
+              <table className="data-table report-details-table" style={{ tableLayout: 'fixed', width: '100%', minWidth: tableMinWidth }}>
                 <thead>
                   <tr>
                     {/* Render Dimensions */}
@@ -746,9 +747,14 @@ export default function ReportsBuilder() {
                   {reportDetails.result.map((row, i) => (
                     <tr key={i}>
                       {/* Dimension Cells */}
-                      {reportDetails.report.dimensions.map(dim => (
-                        <td key={dim} style={{ width: colWidth }}>{formatCell(dim, row[dim], row)}</td>
-                      ))}
+                      {reportDetails.report.dimensions.map(dim => {
+                        const cellValue = formatCell(dim, row[dim], row);
+                        return (
+                          <td key={dim} className="truncate-cell" title={String(cellValue)} style={{ width: colWidth }}>
+                            {cellValue}
+                          </td>
+                        );
+                      })}
                       {/* Metric Cells */}
                       {reportDetails.report.metrics.map(met => (
                         <td key={met} className="text-right" style={{ width: colWidth }}>{formatCell(met, row[met], row)}</td>
