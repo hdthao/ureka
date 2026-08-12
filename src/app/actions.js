@@ -270,6 +270,10 @@ function resolveDateRange(report) {
   return { startStr, endStr };
 }
 
+function getRecordInventory(record) {
+  return Number(record.impressions_dfp ?? record.inventory ?? record.impressions ?? 0);
+}
+
 // Server Action: Get report data (with aggregation/grouping logic based on dimensions)
 export async function getReportDetailsAction(reportId) {
   try {
@@ -330,7 +334,7 @@ export async function getReportDetailsAction(reportId) {
 
       mets.forEach(m => {
         if (m === 'impressions_dfp') {
-          grouped[groupKey][m] += Number(rec.impressions_dfp || 0);
+          grouped[groupKey][m] += getRecordInventory(rec);
         } else if (m === 'pub_revenues') {
           grouped[groupKey][m] += Number(rec.revenues || rec.pub_revenues || 0);
         } else if (m === 'pageview') {
