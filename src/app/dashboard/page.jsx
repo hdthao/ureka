@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { User, LogOut, Menu, X } from 'lucide-react';
 import Dashboard from '../../components/Dashboard';
 import ReportsBuilder from '../../components/ReportsBuilder';
+import { logoutAction } from '../actions';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -25,8 +26,9 @@ export default function DashboardPage() {
     return null; // Prevent flash of header content
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     localStorage.removeItem('ureka_token');
+    await logoutAction();
     router.push('/');
   };
 

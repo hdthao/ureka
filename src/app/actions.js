@@ -1,121 +1,150 @@
 'use server';
 
 import axios from 'axios';
+import { cookies } from 'next/headers';
+import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
+import { subDays, format } from 'date-fns';
+import { connectDB } from '../lib/db';
+import User from '../models/User';
+import Report from '../models/Report';
 
-let cachedCookies = null;
-let cachedCookiesTime = 0;
+const JWT_SECRET = process.env.JWT_SECRET || 'ureka_super_secret_key_123';
 
-async function getWebSessionCookies() {
+// Cache for Ureka SSP API credentials session
+let cachedSSPToken = null;
+let cachedSSPTokenTime = 0;
+
+// Helper: Get shared Ureka SSP API token
+async function getSSPToken() {
   const now = Date.now();
-  // Cache cookies for 30 minutes to optimize speed
-  if (cachedCookies && (now - cachedCookiesTime < 30 * 60 * 1000)) {
-    return cachedCookies;
+  // Cache SSP token for 1 hour
+  if (cachedSSPToken && (now - cachedSSPTokenTime < 1000 * 60 * 60)) {
+    return cachedSSPToken;
   }
 
-  try {
-    // Step 1: GET login page to retrieve the CSRF token and initial cookies
-    const loginPageRes = await axios.get('https://ssp.urekamedia.com/auth/auth/login');
-    const setCookies = loginPageRes.headers['set-cookie'] || [];
-    const cookiesStr = setCookies.map(c => c.split(';')[0]).join('; ');
-
-    const match = loginPageRes.data.match(/name="csrf-token"\s+content="([^"]+)"/);
-    const csrfToken = match ? match[1] : null;
-
-    if (!csrfToken) {
-      throw new Error("Unable to parse CSRF token from login page.");
-    }
-
-    // Step 2: POST credentials to obtain authenticated session cookie
-    const postData = new URLSearchParams({
-      _token: csrfToken,
-      email: 'namtaplamai@gmail.com',
-      password: 'r2d1aqww'
-    }).toString();
-
-    const loginPostRes = await axios.post('https://ssp.urekamedia.com/auth/auth/login', postData, {
-      headers: {
-        'Cookie': cookiesStr,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      maxRedirects: 0,
-      validateStatus: (status) => status >= 200 && status < 400
-    });
-
-    const authSetCookies = loginPostRes.headers['set-cookie'] || [];
-    const authenticatedCookies = authSetCookies.map(c => c.split(';')[0]).join('; ');
-
-    // Merge guest cookies and authenticated session cookies
-    const cookieMap = {};
-    cookiesStr.split('; ').forEach(c => {
-      const [k, v] = c.split('=');
-      if (k && v) cookieMap[k] = v;
-    });
-    if (authenticatedCookies) {
-      authenticatedCookies.split('; ').forEach(c => {
-        const [k, v] = c.split('=');
-        if (k && v) cookieMap[k] = v;
-      });
-    }
-
-    const finalCookies = Object.entries(cookieMap).map(([k, v]) => `${k}=${v}`).join('; ');
-    
-    cachedCookies = finalCookies;
-    cachedCookiesTime = now;
-    return finalCookies;
-  } catch (err) {
-    console.error("Error fetching web session cookies:", err.message);
-    throw err;
-  }
-}
-
-// Wrapper to handle automatic session cookie retry if expired or invalidated
-async function fetchWithSession(url) {
-  let cookies = await getWebSessionCookies();
-  let response = await axios.get(url, {
-    headers: { 'Cookie': cookies }
-  });
-
-  // Check if response is HTML string or missing status === true (signifying session expired or redirect to login)
-  const isInvalidResponse = typeof response.data === 'string' || (response.data && response.data.status !== true);
-  
-  if (isInvalidResponse) {
-    console.log("Session cookie expired or invalid. Re-authenticating on server...");
-    // Invalidate cached cookies and force a new login
-    cachedCookies = null;
-    cachedCookiesTime = 0;
-    cookies = await getWebSessionCookies();
-    
-    response = await axios.get(url, {
-      headers: { 'Cookie': cookies }
-    });
-  }
-  
-  return response.data;
-}
-
-export async function loginAction(email, password) {
+  console.log('Logging in to Ureka SSP with shared publisher account...');
   try {
     const response = await axios.get('https://ssp.urekamedia.com/api/auth/login', {
       params: {
-        email: email,
-        password: password
+        email: 'namtaplamai@gmail.com',
+        password: 'r2d1aqww'
       }
     });
-    
+
     if (response.data && response.data.status && response.data.token) {
-      return { success: true, token: response.data.token };
+      cachedSSPToken = response.data.token;
+      cachedSSPTokenTime = now;
+      return cachedSSPToken;
     }
-    return { success: false, error: response.data.msg || 'Login failed.' };
-  } catch (error) {
-    console.error('Error in loginAction:', error);
-    return { success: false, error: error.message || 'System error during login.' };
+    throw new Error(response.data?.msg || 'Authentication failed');
+  } catch (err) {
+    console.error('Error logging in to Ureka SSP:', err.message);
+    throw new Error('Failed to authenticate with Ureka SSP: ' + err.message);
   }
 }
 
+// Helpers: Local JWT Token implementation using native Node.js crypto
+function generateLocalToken(userId, email) {
+  const payload = JSON.stringify({ userId, email, exp: Date.now() + 1000 * 60 * 60 * 24 * 7 });
+  const hmac = crypto.createHmac('sha256', JWT_SECRET);
+  hmac.update(payload);
+  const signature = hmac.digest('hex');
+  return Buffer.from(payload).toString('base64') + '.' + signature;
+}
+
+// Helper: Get current local logged-in user ID
+async function getCurrentUserId() {
+  const cookieStore = await cookies();
+  const userId = cookieStore.get('local_user_id')?.value;
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+  return userId;
+}
+
+// Server Action: Local Register
+export async function registerAction(email, password) {
+  try {
+    await connectDB();
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      return { success: false, error: 'User already exists with this email.' };
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = await User.create({
+      email: email.toLowerCase(),
+      password: hashedPassword
+    });
+
+    // Set cookie session
+    const cookieStore = await cookies();
+    cookieStore.set('local_user_id', newUser._id.toString(), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 60 * 60 * 24 * 7, // 1 week
+      path: '/'
+    });
+
+    const token = generateLocalToken(newUser._id.toString(), newUser.email);
+    return { success: true, token };
+  } catch (err) {
+    console.error('Error in registerAction:', err);
+    return { success: false, error: err.message || 'System error during registration.' };
+  }
+}
+
+// Server Action: Local Login
+export async function loginAction(email, password) {
+  try {
+    await connectDB();
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return { success: false, error: 'Invalid email or password.' };
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return { success: false, error: 'Invalid email or password.' };
+    }
+
+    // Set cookie session
+    const cookieStore = await cookies();
+    cookieStore.set('local_user_id', user._id.toString(), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 60 * 60 * 24 * 7, // 1 week
+      path: '/'
+    });
+
+    const token = generateLocalToken(user._id.toString(), user.email);
+    return { success: true, token };
+  } catch (err) {
+    console.error('Error in loginAction:', err);
+    return { success: false, error: err.message || 'System error during login.' };
+  }
+}
+
+// Server Action: Local Logout
+export async function logoutAction() {
+  try {
+    const cookieStore = await cookies();
+    cookieStore.delete('local_user_id');
+    return { success: true };
+  } catch (err) {
+    console.error('Error in logoutAction:', err);
+    return { success: false, error: err.message || 'System error during logout.' };
+  }
+}
+
+// Server Action: Fetch raw performance report from SSP (reduced by 20%)
 export async function getReportAction(token, startDate, endDate) {
   try {
     const apiStartDate = startDate.replace(/-/g, '/');
     const apiEndDate = endDate.replace(/-/g, '/');
+
+    const sspToken = await getSSPToken();
 
     const response = await axios.get('https://ssp.urekamedia.com/api/reports/get_report', {
       params: {
@@ -123,7 +152,7 @@ export async function getReportAction(token, startDate, endDate) {
         end_date: apiEndDate
       },
       headers: {
-        Authorization: `Bearer ${token}`
+        Authorization: `Bearer ${sspToken}`
       }
     });
 
@@ -157,135 +186,247 @@ export async function getReportAction(token, startDate, endDate) {
   }
 }
 
+// Server Action: CRUD - Get all reports of the logged-in local user
 export async function getReportsListAction() {
   try {
-    return await fetchWithSession('https://ssp.urekamedia.com/auth/api/reports/reports/get_all_report_of_publisher');
+    await connectDB();
+    const userId = await getCurrentUserId();
+    
+    const list = await Report.find({ userId }).sort({ createdAt: -1 });
+    
+    // Map _id to id for frontend compatibility
+    const mappedList = list.map(item => ({
+      id: item._id.toString(),
+      name: item.name,
+      description: item.description,
+      date_range_type: item.date_range_type,
+      date_dynamic: item.date_dynamic,
+      start_date: item.start_date,
+      end_date: item.end_date,
+      dimensions: item.dimensions,
+      metrics: item.metrics,
+      filters: item.filters,
+      status: item.status
+    }));
+
+    return { status: true, list: mappedList };
   } catch (err) {
     console.error("Error in getReportsListAction:", err.message);
-    return { status: false, error: err.message };
+    return { status: false, error: err.message === 'Unauthorized' ? 'Session expired. Please log in again.' : err.message };
   }
 }
 
+// Helper: Resolve dynamic date ranges
+function resolveDateRange(report) {
+  let startStr, endStr;
+  const today = new Date();
+  
+  if (report.date_range_type === 'dynamic') {
+    if (report.date_dynamic === 'today') {
+      startStr = format(today, 'yyyy/MM/dd');
+      endStr = format(today, 'yyyy/MM/dd');
+    } else if (report.date_dynamic === 'yesterday') {
+      const yest = subDays(today, 1);
+      startStr = format(yest, 'yyyy/MM/dd');
+      endStr = format(yest, 'yyyy/MM/dd');
+    } else if (report.date_dynamic === 'last7days') {
+      const start = subDays(today, 7);
+      const end = subDays(today, 1);
+      startStr = format(start, 'yyyy/MM/dd');
+      endStr = format(end, 'yyyy/MM/dd');
+    } else { // last30days
+      const start = subDays(today, 30);
+      const end = subDays(today, 1);
+      startStr = format(start, 'yyyy/MM/dd');
+      endStr = format(end, 'yyyy/MM/dd');
+    }
+  } else {
+    startStr = report.start_date;
+    endStr = report.end_date;
+  }
+  return { startStr, endStr };
+}
+
+// Server Action: Get report data (with aggregation/grouping logic based on dimensions)
 export async function getReportDetailsAction(reportId) {
   try {
-    const data = await fetchWithSession(`https://ssp.urekamedia.com/auth/api/reports/reports/get_report_data?id=${reportId}`);
-    if (data && data.status) {
-      if (Array.isArray(data.result)) {
-        data.result = data.result.map(item => {
-          const modified = { ...item };
-          if (typeof modified.pub_revenues === 'number') {
-            modified.pub_revenues = modified.pub_revenues * 0.8;
-          } else if (typeof modified.pub_revenues === 'string') {
-            const num = parseFloat(modified.pub_revenues);
-            if (!isNaN(num)) {
-              modified.pub_revenues = num * 0.8;
-            }
+    await connectDB();
+    const userId = await getCurrentUserId();
+
+    const report = await Report.findOne({ _id: reportId, userId });
+    if (!report) {
+      return { status: false, error: 'Report configuration not found.' };
+    }
+
+    const { startStr, endStr } = resolveDateRange(report);
+
+    const sspToken = await getSSPToken();
+    const sspData = await getReportAction(sspToken, startStr.replace(/\//g, '-'), endStr.replace(/\//g, '-'));
+
+    if (!sspData || !sspData.data || !Array.isArray(sspData.data)) {
+      return { status: false, error: 'No data returned from SSP.' };
+    }
+
+    // Filter by website ID
+    let filteredRecords = sspData.data;
+    if (report.filters && report.filters.length > 0) {
+      const siteIdMap = {
+        106083: 'news.pioneerindiya.com',
+        106095: 'feel.pioneerindiya.com'
+      };
+      const allowedSiteNames = report.filters.map(id => siteIdMap[id]).filter(Boolean);
+      filteredRecords = filteredRecords.filter(rec => allowedSiteNames.includes(rec.sites_name));
+    }
+
+    const dims = report.dimensions;
+    const mets = report.metrics;
+    const grouped = {};
+
+    for (const rec of filteredRecords) {
+      const keyParts = dims.map(d => {
+        if (d === 'sites') return rec.sites_name || '-';
+        if (d === 'adunits') return rec.adunits_name || '-';
+        if (d === 'formats') return rec.formats || (rec.adunits_name ? rec.adunits_name.split('_')[0] : '-');
+        return rec[d] || '-';
+      });
+      const groupKey = keyParts.join('|||');
+
+      if (!grouped[groupKey]) {
+        grouped[groupKey] = {};
+        dims.forEach((d, idx) => {
+          if (d === 'sites') {
+            grouped[groupKey].sites_name = keyParts[idx];
+          } else if (d === 'adunits') {
+            grouped[groupKey].adunits_name = keyParts[idx];
+          } else if (d === 'formats') {
+            grouped[groupKey].formats = keyParts[idx];
+          } else {
+            grouped[groupKey][d] = keyParts[idx];
           }
-          if (typeof modified.vrpm === 'number') {
-            modified.vrpm = modified.vrpm * 0.8;
-          } else if (typeof modified.vrpm === 'string') {
-            const num = parseFloat(modified.vrpm);
-            if (!isNaN(num)) {
-              modified.vrpm = num * 0.8;
-            }
-          }
-          return modified;
+        });
+        mets.forEach(m => {
+          grouped[groupKey][m] = 0;
         });
       }
-      if (data.summary) {
-        if (typeof data.summary.pub_revenues === 'number') {
-          data.summary.pub_revenues = data.summary.pub_revenues * 0.8;
-        } else if (typeof data.summary.pub_revenues === 'string') {
-          const num = parseFloat(data.summary.pub_revenues);
-          if (!isNaN(num)) {
-            data.summary.pub_revenues = num * 0.8;
-          }
-        }
-        if (typeof data.summary.vrpm === 'number') {
-          data.summary.vrpm = data.summary.vrpm * 0.8;
-        } else if (typeof data.summary.vrpm === 'string') {
-          const num = parseFloat(data.summary.vrpm);
-          if (!isNaN(num)) {
-            data.summary.vrpm = num * 0.8;
-          }
-        }
-      }
-    }
-    return data;
-  } catch (err) {
-    console.error("Error in getReportDetailsAction:", err.message);
-    return { status: false, error: err.message };
-  }
-}
 
-async function postWithSession(url, postData) {
-  let cookies = await getWebSessionCookies();
-  
-  const getCsrf = async (cookieStr) => {
-    const res = await axios.get('https://ssp.urekamedia.com/auth/reports/reports', {
-      headers: { 'Cookie': cookieStr }
-    });
-    const match = res.data.match(/name="csrf-token"\s+content="([^"]+)"/);
-    return match ? match[1] : null;
-  };
-
-  let csrfToken = await getCsrf(cookies);
-  
-  let response;
-  try {
-    response = await axios.post(url, postData, {
-      headers: {
-        'Cookie': cookies,
-        'X-CSRF-TOKEN': csrfToken,
-        'Content-Type': 'application/json'
-      }
-    });
-  } catch (err) {
-    const status = err.response ? err.response.status : 0;
-    if (status === 400 || status === 419 || status === 401) {
-      console.log("POST session expired or CSRF token mismatch. Re-authenticating...");
-      cachedCookies = null;
-      cachedCookiesTime = 0;
-      cookies = await getWebSessionCookies();
-      csrfToken = await getCsrf(cookies);
-      response = await axios.post(url, postData, {
-        headers: {
-          'Cookie': cookies,
-          'X-CSRF-TOKEN': csrfToken,
-          'Content-Type': 'application/json'
+      mets.forEach(m => {
+        if (m === 'impressions_dfp') {
+          grouped[groupKey][m] += Number(rec.impressions_dfp || 0);
+        } else if (m === 'pub_revenues') {
+          grouped[groupKey][m] += Number(rec.revenues || rec.pub_revenues || 0);
+        } else if (m === 'pageview') {
+          grouped[groupKey][m] += Number(rec.pageview || 0);
         }
       });
-    } else {
-      throw err;
     }
+
+    const result = Object.values(grouped).map(item => {
+      if (mets.includes('vrpm')) {
+        const rev = item.pub_revenues || 0;
+        const imp = item.impressions_dfp || 0;
+        item.vrpm = imp > 0 ? (rev / imp) * 1000 : 0;
+      }
+      return item;
+    });
+
+    const summary = {};
+    mets.forEach(m => {
+      summary[m] = 0;
+    });
+
+    result.forEach(item => {
+      mets.forEach(m => {
+        if (m !== 'vrpm') {
+          summary[m] += item[m];
+        }
+      });
+    });
+
+    if (mets.includes('vrpm')) {
+      const rev = summary.pub_revenues || 0;
+      const imp = summary.impressions_dfp || 0;
+      summary.vrpm = imp > 0 ? (rev / imp) * 1000 : 0;
+    }
+
+    return {
+      status: true,
+      report: {
+        id: report._id.toString(),
+        name: report.name,
+        description: report.description,
+        date_range_type: report.date_range_type,
+        date_dynamic: report.date_dynamic,
+        start_date: report.start_date,
+        end_date: report.end_date,
+        dimensions: report.dimensions,
+        metrics: report.metrics,
+        filters: report.filters
+      },
+      result,
+      summary
+    };
+  } catch (err) {
+    console.error("Error in getReportDetailsAction:", err.message);
+    return { status: false, error: err.message === 'Unauthorized' ? 'Session expired. Please log in again.' : err.message };
   }
-  
-  return response.data;
 }
 
+// Server Action: CRUD - Create new report config locally
 export async function createReportAction(reportData) {
   try {
-    return await postWithSession('https://ssp.urekamedia.com/auth/api/reports/reports/store', reportData);
+    await connectDB();
+    const userId = await getCurrentUserId();
+
+    const report = await Report.create({
+      ...reportData,
+      userId
+    });
+
+    return { status: true, id: report._id.toString() };
   } catch (err) {
     console.error("Error in createReportAction:", err.message);
-    return { status: false, error: err.message };
+    return { status: false, error: err.message === 'Unauthorized' ? 'Session expired. Please log in again.' : err.message };
   }
 }
 
+// Server Action: CRUD - Update report config locally
 export async function updateReportAction(reportData) {
   try {
-    return await postWithSession('https://ssp.urekamedia.com/auth/api/reports/reports/update', reportData);
+    await connectDB();
+    const userId = await getCurrentUserId();
+    const { id, ...updateData } = reportData;
+
+    const report = await Report.findOneAndUpdate(
+      { _id: id, userId },
+      updateData,
+      { new: true }
+    );
+
+    if (!report) {
+      return { status: false, error: 'Report config not found.' };
+    }
+
+    return { status: true };
   } catch (err) {
     console.error("Error in updateReportAction:", err.message);
-    return { status: false, error: err.message };
+    return { status: false, error: err.message === 'Unauthorized' ? 'Session expired. Please log in again.' : err.message };
   }
 }
 
+// Server Action: CRUD - Delete report config locally
 export async function deleteReportAction(reportId) {
   try {
-    return await fetchWithSession(`https://ssp.urekamedia.com/auth/api/reports/reports/delete?id=${reportId}`);
+    await connectDB();
+    const userId = await getCurrentUserId();
+
+    const report = await Report.findOneAndDelete({ _id: reportId, userId });
+    if (!report) {
+      return { status: false, error: 'Report config not found.' };
+    }
+
+    return { status: true };
   } catch (err) {
     console.error("Error in deleteReportAction:", err.message);
-    return { status: false, error: err.message };
+    return { status: false, error: err.message === 'Unauthorized' ? 'Session expired. Please log in again.' : err.message };
   }
 }
