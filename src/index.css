@@ -10,20 +10,20 @@
   --color-bg-body: #f4f7f6;
   --color-bg-card: #ffffff;
   --color-border: #e0e0e0;
-  
+
   /* Chart Colors */
   --chart-primary: #7952b3;
   --chart-secondary: #6c757d;
   --chart-success: #4caf50;
-  
+
   /* Typography */
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  
+
   /* Shadows */
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
   --shadow-md: 0 4px 6px rgba(0,0,0,0.05);
   --shadow-lg: 0 10px 15px rgba(0,0,0,0.05);
-  
+
   /* Border Radius */
   --radius-sm: 4px;
   --radius-md: 8px;
@@ -234,14 +234,6 @@ body {
   color: var(--color-text-muted);
   margin-bottom: 12px;
 }
-
-.stat-change {
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-.stat-change.positive { color: var(--chart-success); }
-.stat-change.negative { color: #f44336; }
-.stat-change.neutral { color: var(--color-text-muted); }
 
 /* Charts */
 .chart-section {
@@ -637,4 +629,3 @@ body {
   font-weight: 600;
   color: var(--color-text-main);
 }
-
