@@ -330,6 +330,18 @@ export async function getReportDetailsAction(reportId) {
         mets.forEach(m => {
           grouped[groupKey][m] = 0;
         });
+        grouped[groupKey].__pageviewKeys = new Set();
+        grouped[groupKey].__pageviewForVrpm = 0;
+      }
+
+      const pageviewKey = `${rec.sites_name || '-'}|||${rec.date || '-'}`;
+      if (!grouped[groupKey].__pageviewKeys.has(pageviewKey)) {
+        const pageview = Number(rec.pageview || 0);
+        grouped[groupKey].__pageviewKeys.add(pageviewKey);
+        grouped[groupKey].__pageviewForVrpm += pageview;
+        if (mets.includes('pageview')) {
+          grouped[groupKey].pageview += pageview;
+        }
       }
 
       mets.forEach(m => {
@@ -337,19 +349,22 @@ export async function getReportDetailsAction(reportId) {
           grouped[groupKey][m] += getRecordInventory(rec);
         } else if (m === 'pub_revenues') {
           grouped[groupKey][m] += Number(rec.revenues || rec.pub_revenues || 0);
-        } else if (m === 'pageview') {
-          grouped[groupKey][m] += Number(rec.pageview || 0);
         }
       });
     }
 
+    let totalPageviewForVrpm = 0;
     const result = Object.values(grouped).map(item => {
+      const pageviewForVrpm = item.__pageviewForVrpm || 0;
+      totalPageviewForVrpm += pageviewForVrpm;
+      const visibleItem = { ...item };
+      delete visibleItem.__pageviewKeys;
+      delete visibleItem.__pageviewForVrpm;
       if (mets.includes('vrpm')) {
-        const rev = item.pub_revenues || 0;
-        const imp = item.impressions_dfp || 0;
-        item.vrpm = imp > 0 ? (rev / imp) * 1000 : 0;
+        const rev = visibleItem.pub_revenues || 0;
+        visibleItem.vrpm = pageviewForVrpm > 0 ? (rev / pageviewForVrpm) * 1000 : 0;
       }
-      return item;
+      return visibleItem;
     });
 
     const summary = {};
@@ -367,8 +382,7 @@ export async function getReportDetailsAction(reportId) {
 
     if (mets.includes('vrpm')) {
       const rev = summary.pub_revenues || 0;
-      const imp = summary.impressions_dfp || 0;
-      summary.vrpm = imp > 0 ? (rev / imp) * 1000 : 0;
+      summary.vrpm = totalPageviewForVrpm > 0 ? (rev / totalPageviewForVrpm) * 1000 : 0;
     }
 
     return {
