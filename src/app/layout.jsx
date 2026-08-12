@@ -1,8 +1,8 @@
 import '../index.css';
 
 export const metadata = {
-  title: 'SSP',
-  description: 'Ureka SSP Dashboard',
+  title: 'HUNAMEDIA',
+  description: 'Ureka HUNAMEDIA Dashboard',
 };
 
 export default function RootLayout({ children }) {

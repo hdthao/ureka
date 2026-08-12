@@ -221,14 +221,14 @@ export default function Dashboard() {
     });
 
     // Format Pageview main value (e.g. 3.52k) and sub value (e.g. 3,518)
-    const pageviewMain = pageviewTotal >= 1000 
-      ? (pageviewTotal / 1000).toFixed(2) + 'k' 
+    const pageviewMain = pageviewTotal >= 1000
+      ? (pageviewTotal / 1000).toFixed(2) + 'k'
       : pageviewTotal.toString();
     const pageviewSub = pageviewTotal.toLocaleString('en-US');
 
     // Format Inventory main value (e.g. 14.73k) and sub value (e.g. 14,731)
-    const inventoryMain = inventoryTotal >= 1000 
-      ? (inventoryTotal / 1000).toFixed(2) + 'k' 
+    const inventoryMain = inventoryTotal >= 1000
+      ? (inventoryTotal / 1000).toFixed(3) + 'k'
       : inventoryTotal.toString();
     const inventorySub = inventoryTotal.toLocaleString('en-US');
 
@@ -275,7 +275,7 @@ export default function Dashboard() {
       summary: {
         inventory: inventoryMain,
         inventoryRaw: inventorySub,
-        revenues: revenuesTotal.toFixed(1) + ' $',
+        revenues: revenuesTotal.toFixed(2) + ' $',
         revenuesRaw: revenuesTotal.toFixed(2),
         pageview: pageviewMain,
         pageviewSub: pageviewSub,
@@ -542,8 +542,8 @@ export default function Dashboard() {
           <p style={{ maxWidth: '400px', fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>
             Vui lòng chọn ít nhất một website từ danh sách lọc ở trên để hiển thị dữ liệu thống kê và biểu đồ.
           </p>
-          <button 
-            className="retry-btn" 
+          <button
+            className="retry-btn"
             onClick={() => setSelectedSites(allSites)}
             style={{ marginTop: '8px' }}
           >
@@ -553,29 +553,29 @@ export default function Dashboard() {
       ) : (
         <>
           <div className="stats-grid">
-            <StatCard 
-              title="Inventory" 
-              mainValue={summary.inventory} 
-              subValue={summary.inventoryRaw} 
-              change={0} 
+            <StatCard
+              title="Inventory"
+              mainValue={summary.inventory}
+              subValue={summary.inventoryRaw}
+              change={0}
             />
-            <StatCard 
-              title="Publisher's Revenues (USD)" 
-              mainValue={summary.revenues} 
-              subValue={summary.revenuesRaw} 
-              change={0} 
+            <StatCard
+              title="Publisher's Revenues (USD)"
+              mainValue={summary.revenues}
+              subValue={summary.revenuesRaw}
+              change={0}
             />
-            <StatCard 
-              title="Pageview" 
-              mainValue={summary.pageview} 
-              subValue={summary.pageviewSub} 
-              change={0} 
+            <StatCard
+              title="Pageview"
+              mainValue={summary.pageview}
+              subValue={summary.pageviewSub}
+              change={0}
             />
-            <StatCard 
-              title="VRPM" 
-              mainValue={summary.vrpm} 
-              subValue={summary.vrpm} 
-              change={0} 
+            <StatCard
+              title="VRPM"
+              mainValue={summary.vrpm}
+              subValue={summary.vrpm}
+              change={0}
             />
           </div>
 

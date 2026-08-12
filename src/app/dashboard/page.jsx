@@ -44,7 +44,7 @@ export default function DashboardPage() {
 
         <div className="brand">
           <img src="/favicon.svg" alt="Ureka Logo" style={{ height: '28px', width: '28px', borderRadius: '6px' }} />
-          SSP
+          HUNAMEDIA
         </div>
 
         {/* Navigation Links */}

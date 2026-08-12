@@ -44,7 +44,7 @@ export default function Login() {
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
           <img src="/favicon.svg" alt="Ureka Logo" style={{ height: '48px', width: '48px', borderRadius: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
         </div>
-        <h2 className="login-title" style={{ textAlign: 'center' }}>Sign in to Report SSP</h2>
+        <h2 className="login-title" style={{ textAlign: 'center' }}>Sign in to Report HUNAMEDIA</h2>
         <p className="login-subtitle" style={{ textAlign: 'center' }}>Welcome back! Please enter your details.</p>
 
         {error && <div className="login-error">{error}</div>}
