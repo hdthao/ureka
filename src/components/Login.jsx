@@ -2,13 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { loginAction, registerAction } from '../app/actions';
+import { loginAction } from '../app/actions';
 
 export default function Login() {
-  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -26,19 +24,8 @@ export default function Login() {
     setLoading(true);
     setError(null);
 
-    if (isSignUp && password !== confirmPassword) {
-      setError("Passwords do not match!");
-      setLoading(false);
-      return;
-    }
-
     try {
-      let res;
-      if (isSignUp) {
-        res = await registerAction(email, password);
-      } else {
-        res = await loginAction(email, password);
-      }
+      const res = await loginAction(email, password);
 
       if (res.success) {
         localStorage.setItem('ureka_token', res.token);
@@ -61,11 +48,11 @@ export default function Login() {
         </div>
         
         <h2 className="login-title" style={{ textAlign: 'center', fontSize: '1.5rem', marginBottom: '8px' }}>
-          {isSignUp ? 'Create Local Account' : 'Sign in to HUNAMEDIA'}
+          Sign in to HUNAMEDIA
         </h2>
         
         <p className="login-subtitle" style={{ textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.85rem', marginBottom: '24px' }}>
-          {isSignUp ? 'Sign up to manage your private report configurations.' : 'Welcome back! Please enter your details.'}
+          Welcome back! Please enter your details.
         </p>
 
         {error && <div className="login-error" style={{ marginBottom: '16px' }}>{error}</div>}
@@ -97,21 +84,6 @@ export default function Login() {
             />
           </div>
 
-          {isSignUp && (
-            <div className="form-group">
-              <label style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '6px', display: 'block' }}>Confirm Password</label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm your password"
-                required
-                disabled={loading}
-                style={{ width: '100%', padding: '8px 12px', border: '1px solid #ccc', borderRadius: '4px' }}
-              />
-            </div>
-          )}
-
           <button 
             type="submit" 
             className="login-btn" 
@@ -128,33 +100,9 @@ export default function Login() {
               marginTop: '8px'
             }}
           >
-            {loading ? (isSignUp ? 'Creating account...' : 'Signing in...') : (isSignUp ? 'Sign Up' : 'Sign In')}
+            {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
-
-        <div style={{ textAlign: 'center', marginTop: '20px', fontSize: '0.85rem' }}>
-          {isSignUp ? (
-            <>
-              Already have an account?{' '}
-              <span 
-                onClick={() => { setIsSignUp(false); setError(null); }} 
-                style={{ color: 'var(--color-accent)', cursor: 'pointer', fontWeight: 600 }}
-              >
-                Sign In
-              </span>
-            </>
-          ) : (
-            <>
-              Don't have an account?{' '}
-              <span 
-                onClick={() => { setIsSignUp(true); setError(null); }} 
-                style={{ color: 'var(--color-accent)', cursor: 'pointer', fontWeight: 600 }}
-              >
-                Sign Up
-              </span>
-            </>
-          )}
-        </div>
       </div>
     </div>
   );

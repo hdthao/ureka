@@ -11,6 +11,16 @@ import Report from '../models/Report';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'ureka_super_secret_key_123';
 
+const SITE_CATALOG = [
+  { id: 106083, name: 'news.pioneerindiya.com' },
+  { id: 106095, name: 'feel.pioneerindiya.com' }
+];
+
+const SITE_NAME_BY_ID = SITE_CATALOG.reduce((map, site) => {
+  map[site.id] = site.name;
+  return map;
+}, {});
+
 // Cache for Ureka SSP API credentials session
 let cachedSSPToken = null;
 let cachedSSPTokenTime = 0;
@@ -63,35 +73,37 @@ async function getCurrentUserId() {
   return userId;
 }
 
-// Server Action: Local Register
-export async function registerAction(email, password) {
+async function getCurrentUser() {
+  const userId = await getCurrentUserId();
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new Error('Unauthorized');
+  }
+  return user;
+}
+
+function getAllowedSiteIds(user) {
+  const validSiteIds = new Set(SITE_CATALOG.map(site => site.id));
+  return (user.allowedSites || []).filter(siteId => validSiteIds.has(siteId));
+}
+
+function sanitizeReportFilters(filters, allowedSiteIds) {
+  const requestedSiteIds = Array.isArray(filters) ? filters.map(Number).filter(Boolean) : [];
+  const allowedSet = new Set(allowedSiteIds);
+  const sanitized = requestedSiteIds.filter(siteId => allowedSet.has(siteId));
+  return sanitized.length > 0 ? sanitized : allowedSiteIds;
+}
+
+export async function getAllowedSitesAction() {
   try {
     await connectDB();
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
-    if (existingUser) {
-      return { success: false, error: 'User already exists with this email.' };
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = await User.create({
-      email: email.toLowerCase(),
-      password: hashedPassword
-    });
-
-    // Set cookie session
-    const cookieStore = await cookies();
-    cookieStore.set('local_user_id', newUser._id.toString(), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24 * 7, // 1 week
-      path: '/'
-    });
-
-    const token = generateLocalToken(newUser._id.toString(), newUser.email);
-    return { success: true, token };
+    const user = await getCurrentUser();
+    const allowedSiteIds = getAllowedSiteIds(user);
+    const sites = SITE_CATALOG.filter(site => allowedSiteIds.includes(site.id));
+    return { status: true, sites };
   } catch (err) {
-    console.error('Error in registerAction:', err);
-    return { success: false, error: err.message || 'System error during registration.' };
+    console.error("Error in getAllowedSitesAction:", err.message);
+    return { status: false, error: err.message === 'Unauthorized' ? 'Session expired. Please log in again.' : err.message };
   }
 }
 
@@ -190,7 +202,9 @@ export async function getReportAction(token, startDate, endDate) {
 export async function getReportsListAction() {
   try {
     await connectDB();
-    const userId = await getCurrentUserId();
+    const user = await getCurrentUser();
+    const userId = user._id;
+    const allowedSiteIds = getAllowedSiteIds(user);
     
     const list = await Report.find({ userId }).sort({ createdAt: -1 });
     
@@ -205,7 +219,7 @@ export async function getReportsListAction() {
       end_date: item.end_date,
       dimensions: item.dimensions,
       metrics: item.metrics,
-      filters: item.filters,
+      filters: sanitizeReportFilters(item.filters, allowedSiteIds),
       status: item.status
     }));
 
@@ -251,7 +265,9 @@ function resolveDateRange(report) {
 export async function getReportDetailsAction(reportId) {
   try {
     await connectDB();
-    const userId = await getCurrentUserId();
+    const user = await getCurrentUser();
+    const userId = user._id;
+    const allowedSiteIds = getAllowedSiteIds(user);
 
     const report = await Report.findOne({ _id: reportId, userId });
     if (!report) {
@@ -268,15 +284,9 @@ export async function getReportDetailsAction(reportId) {
     }
 
     // Filter by website ID
-    let filteredRecords = sspData.data;
-    if (report.filters && report.filters.length > 0) {
-      const siteIdMap = {
-        106083: 'news.pioneerindiya.com',
-        106095: 'feel.pioneerindiya.com'
-      };
-      const allowedSiteNames = report.filters.map(id => siteIdMap[id]).filter(Boolean);
-      filteredRecords = filteredRecords.filter(rec => allowedSiteNames.includes(rec.sites_name));
-    }
+    const effectiveSiteIds = sanitizeReportFilters(report.filters, allowedSiteIds);
+    const allowedSiteNames = effectiveSiteIds.map(id => SITE_NAME_BY_ID[id]).filter(Boolean);
+    const filteredRecords = sspData.data.filter(rec => allowedSiteNames.includes(rec.sites_name));
 
     const dims = report.dimensions;
     const mets = report.metrics;
@@ -360,7 +370,7 @@ export async function getReportDetailsAction(reportId) {
         end_date: report.end_date,
         dimensions: report.dimensions,
         metrics: report.metrics,
-        filters: report.filters
+        filters: effectiveSiteIds
       },
       result,
       summary
@@ -375,10 +385,16 @@ export async function getReportDetailsAction(reportId) {
 export async function createReportAction(reportData) {
   try {
     await connectDB();
-    const userId = await getCurrentUserId();
+    const user = await getCurrentUser();
+    const userId = user._id;
+    const allowedSiteIds = getAllowedSiteIds(user);
+    if (allowedSiteIds.length === 0) {
+      return { status: false, error: 'No websites are assigned to this account.' };
+    }
 
     const report = await Report.create({
       ...reportData,
+      filters: sanitizeReportFilters(reportData.filters, allowedSiteIds),
       userId
     });
 
@@ -393,8 +409,14 @@ export async function createReportAction(reportData) {
 export async function updateReportAction(reportData) {
   try {
     await connectDB();
-    const userId = await getCurrentUserId();
+    const user = await getCurrentUser();
+    const userId = user._id;
+    const allowedSiteIds = getAllowedSiteIds(user);
+    if (allowedSiteIds.length === 0) {
+      return { status: false, error: 'No websites are assigned to this account.' };
+    }
     const { id, ...updateData } = reportData;
+    updateData.filters = sanitizeReportFilters(updateData.filters, allowedSiteIds);
 
     const report = await Report.findOneAndUpdate(
       { _id: id, userId },

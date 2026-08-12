@@ -3,17 +3,13 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Download, RefreshCw, BarChart2, Plus, Edit2, Trash2, Save, X, Calendar } from 'lucide-react';
 import { 
+  getAllowedSitesAction,
   getReportsListAction, 
   getReportDetailsAction, 
   createReportAction, 
   updateReportAction, 
   deleteReportAction 
 } from '../app/actions';
-
-const SITES_LIST = [
-  { id: 106083, name: 'news.pioneerindiya.com' },
-  { id: 106095, name: 'feel.pioneerindiya.com' }
-];
 
 const AVAILABLE_DIMENSIONS = [
   { key: 'date', label: 'Date' },
@@ -42,6 +38,7 @@ function formatReportCode(id) {
 
 export default function ReportsBuilder() {
   const [reports, setReports] = useState([]);
+  const [sitesList, setSitesList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -76,11 +73,21 @@ export default function ReportsBuilder() {
     setLoading(true);
     setError(null);
     try {
-      const res = await getReportsListAction();
-      if (res && res.status && res.list) {
-        setReports(res.list);
+      const [reportsRes, sitesRes] = await Promise.all([
+        getReportsListAction(),
+        getAllowedSitesAction()
+      ]);
+
+      if (sitesRes && sitesRes.status && sitesRes.sites) {
+        setSitesList(sitesRes.sites);
       } else {
-        setError(res?.error || "Unable to fetch reports list.");
+        setSitesList([]);
+      }
+
+      if (reportsRes && reportsRes.status && reportsRes.list) {
+        setReports(reportsRes.list);
+      } else {
+        setError(reportsRes?.error || "Unable to fetch reports list.");
       }
     } catch (err) {
       setError("A system error occurred while loading reports.");
@@ -123,7 +130,7 @@ export default function ReportsBuilder() {
     setFormEndDate('');
     setFormDimensions(['date', 'sites']);
     setFormMetrics(['impressions_dfp', 'pub_revenues', 'pageview', 'vrpm']);
-    setFormFilters([]);
+    setFormFilters(sitesList.map(site => site.id));
     setFormStatus(1);
     setFormError(null);
     setViewMode('create');
@@ -172,7 +179,9 @@ export default function ReportsBuilder() {
     } catch (e) {
       filts = [];
     }
-    setFormFilters(Array.isArray(filts) ? filts : []);
+    const allowedSiteIds = sitesList.map(site => site.id);
+    const normalizedFilters = Array.isArray(filts) ? filts.map(Number).filter(siteId => allowedSiteIds.includes(siteId)) : [];
+    setFormFilters(normalizedFilters.length > 0 ? normalizedFilters : allowedSiteIds);
 
     setFormStatus(report.status !== undefined ? report.status : 1);
     setFormError(null);
@@ -546,7 +555,12 @@ export default function ReportsBuilder() {
             <div style={{ background: '#fafafa', padding: '16px', borderRadius: '8px', border: '1px solid #eaeaea' }}>
               <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '12px' }}>Website Filter</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {SITES_LIST.map(site => {
+                {sitesList.length === 0 && (
+                  <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+                    No websites are assigned to this account.
+                  </div>
+                )}
+                {sitesList.map(site => {
                   const isSelected = formFilters.includes(site.id);
                   return (
                     <label 
@@ -774,6 +788,8 @@ export default function ReportsBuilder() {
         </div>
         <button
           onClick={handleInitCreate}
+          disabled={sitesList.length === 0}
+          title={sitesList.length === 0 ? 'No websites are assigned to this account.' : 'Create Report'}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -784,7 +800,7 @@ export default function ReportsBuilder() {
             border: 'none',
             borderRadius: '4px',
             fontWeight: 600,
-            cursor: 'pointer',
+            cursor: sitesList.length === 0 ? 'not-allowed' : 'pointer',
             fontSize: '0.9rem'
           }}
         >

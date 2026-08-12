@@ -10,7 +10,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "upsert-user": "node scripts/upsert-user.mjs"
   },
   "dependencies": {
     "axios": "^1.19.0",
