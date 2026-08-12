@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Download, RefreshCw, BarChart2, Plus, Edit2, Trash2, Save, X, Calendar } from 'lucide-react';
-import { 
+import {
   getAllowedSitesAction,
-  getReportsListAction, 
-  getReportDetailsAction, 
-  createReportAction, 
-  updateReportAction, 
-  deleteReportAction 
+  getReportsListAction,
+  getReportDetailsAction,
+  createReportAction,
+  updateReportAction,
+  deleteReportAction
 } from '../app/actions';
 
 const AVAILABLE_DIMENSIONS = [
@@ -20,7 +20,7 @@ const AVAILABLE_DIMENSIONS = [
 
 const AVAILABLE_METRICS = [
   { key: 'impressions_dfp', label: 'Inventory' },
-  { key: 'pub_revenues', label: 'Publisher Revenues (USD)' },
+  { key: 'pub_revenues', label: 'Revenues (USD)' },
   { key: 'pageview', label: 'Pageview' },
   { key: 'vrpm', label: 'VRPM' }
 ];
@@ -45,7 +45,7 @@ export default function ReportsBuilder() {
   // View state: 'list' | 'details' | 'create' | 'edit'
   const [viewMode, setViewMode] = useState('list');
   const [selectedReportId, setSelectedReportId] = useState(null);
-  
+
   // Details view states
   const [reportDetails, setReportDetails] = useState(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
@@ -141,7 +141,7 @@ export default function ReportsBuilder() {
     setFormDescription(report.description || '');
     setFormDateRangeType(report.date_range_type || 'dynamic');
     setFormDateDynamic(report.date_dynamic || 'yesterday');
-    
+
     // Convert date formats if custom
     if (report.start_date) {
       setFormStartDate(report.start_date.replace(/\//g, '-'));
@@ -249,33 +249,33 @@ export default function ReportsBuilder() {
   };
 
   const handleToggleDimension = (dimKey) => {
-    setFormDimensions(prev => 
+    setFormDimensions(prev =>
       prev.includes(dimKey) ? prev.filter(k => k !== dimKey) : [...prev, dimKey]
     );
   };
 
   const handleToggleMetric = (metKey) => {
-    setFormMetrics(prev => 
+    setFormMetrics(prev =>
       prev.includes(metKey) ? prev.filter(k => k !== metKey) : [...prev, metKey]
     );
   };
 
   const handleToggleFilter = (siteId) => {
-    setFormFilters(prev => 
+    setFormFilters(prev =>
       prev.includes(siteId) ? prev.filter(id => id !== siteId) : [...prev, siteId]
     );
   };
 
   const handleExportCSV = () => {
     if (!reportDetails || !reportDetails.result) return;
-    
+
     const { report, result, summary } = reportDetails;
-    
+
     const labelMap = {
       date: 'Date',
       sites: 'Sites',
       impressions_dfp: 'Inventory',
-      pub_revenues: 'Publisher Revenues (USD)',
+      pub_revenues: 'Revenues (USD)',
       pageview: 'Pageview',
       vrpm: 'VRPM'
     };
@@ -375,9 +375,9 @@ export default function ReportsBuilder() {
             <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>
               {viewMode === 'create' ? 'Create Report Configuration' : 'Edit Report Configuration'}
             </h2>
-            <button 
-              className="retry-btn" 
-              onClick={() => setViewMode('list')} 
+            <button
+              className="retry-btn"
+              onClick={() => setViewMode('list')}
               style={{ background: '#757575', padding: '6px 12px', fontSize: '0.85rem' }}
             >
               Back to list
@@ -391,16 +391,16 @@ export default function ReportsBuilder() {
           )}
 
           <form onSubmit={handleSubmitForm} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            
+
             {/* Name & Description */}
             <div style={{ background: '#fafafa', padding: '16px', borderRadius: '8px', border: '1px solid #eaeaea' }}>
               <div className="form-group" style={{ marginBottom: '16px' }}>
                 <label style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '6px', display: 'block' }}>Report Name <span style={{ color: 'red' }}>*</span></label>
-                <input 
-                  type="text" 
-                  value={formName} 
-                  onChange={(e) => setFormName(e.target.value)} 
-                  placeholder="Enter report configuration name..." 
+                <input
+                  type="text"
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                  placeholder="Enter report configuration name..."
                   style={{ width: '100%', padding: '8px 12px', border: '1px solid #ccc', borderRadius: '4px' }}
                   required
                   disabled={formSubmitting}
@@ -409,10 +409,10 @@ export default function ReportsBuilder() {
 
               <div className="form-group">
                 <label style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '6px', display: 'block' }}>Description</label>
-                <textarea 
-                  value={formDescription} 
-                  onChange={(e) => setFormDescription(e.target.value)} 
-                  placeholder="Enter a short description..." 
+                <textarea
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  placeholder="Enter a short description..."
                   style={{ width: '100%', padding: '8px 12px', border: '1px solid #ccc', borderRadius: '4px', minHeight: '80px', fontFamily: 'inherit' }}
                   disabled={formSubmitting}
                 />
@@ -427,20 +427,20 @@ export default function ReportsBuilder() {
 
               <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
                 <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.9rem' }}>
-                  <input 
-                    type="radio" 
-                    name="date_range_type" 
-                    checked={formDateRangeType === 'dynamic'} 
+                  <input
+                    type="radio"
+                    name="date_range_type"
+                    checked={formDateRangeType === 'dynamic'}
                     onChange={() => setFormDateRangeType('dynamic')}
                     disabled={formSubmitting}
                   />
                   Dynamic range
                 </label>
                 <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.9rem' }}>
-                  <input 
-                    type="radio" 
-                    name="date_range_type" 
-                    checked={formDateRangeType === 'custom'} 
+                  <input
+                    type="radio"
+                    name="date_range_type"
+                    checked={formDateRangeType === 'custom'}
                     onChange={() => setFormDateRangeType('custom')}
                     disabled={formSubmitting}
                   />
@@ -451,8 +451,8 @@ export default function ReportsBuilder() {
               {formDateRangeType === 'dynamic' ? (
                 <div className="form-group">
                   <label style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '6px', display: 'block' }}>Select dynamic range</label>
-                  <select 
-                    value={formDateDynamic} 
+                  <select
+                    value={formDateDynamic}
                     onChange={(e) => setFormDateDynamic(e.target.value)}
                     style={{ padding: '8px 12px', border: '1px solid #ccc', borderRadius: '4px', width: '200px' }}
                     disabled={formSubmitting}
@@ -467,9 +467,9 @@ export default function ReportsBuilder() {
                 <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                   <div className="form-group">
                     <label style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '6px', display: 'block' }}>Start Date</label>
-                    <input 
-                      type="date" 
-                      value={formStartDate} 
+                    <input
+                      type="date"
+                      value={formStartDate}
                       onChange={(e) => setFormStartDate(e.target.value)}
                       style={{ padding: '8px 12px', border: '1px solid #ccc', borderRadius: '4px' }}
                       disabled={formSubmitting}
@@ -477,9 +477,9 @@ export default function ReportsBuilder() {
                   </div>
                   <div className="form-group">
                     <label style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '6px', display: 'block' }}>End Date</label>
-                    <input 
-                      type="date" 
-                      value={formEndDate} 
+                    <input
+                      type="date"
+                      value={formEndDate}
                       onChange={(e) => setFormEndDate(e.target.value)}
                       style={{ padding: '8px 12px', border: '1px solid #ccc', borderRadius: '4px' }}
                       disabled={formSubmitting}
@@ -563,13 +563,13 @@ export default function ReportsBuilder() {
                 {sitesList.map(site => {
                   const isSelected = formFilters.includes(site.id);
                   return (
-                    <label 
-                      key={site.id} 
-                      style={{ 
-                        display: 'inline-flex', 
-                        alignItems: 'center', 
-                        gap: '8px', 
-                        cursor: 'pointer', 
+                    <label
+                      key={site.id}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        cursor: 'pointer',
                         fontSize: '0.9rem',
                         padding: '6px 10px',
                         borderRadius: '4px',
@@ -578,9 +578,9 @@ export default function ReportsBuilder() {
                         maxWidth: '300px'
                       }}
                     >
-                      <input 
-                        type="checkbox" 
-                        checked={isSelected} 
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
                         onChange={() => handleToggleFilter(site.id)}
                         disabled={formSubmitting}
                       />
@@ -622,7 +622,7 @@ export default function ReportsBuilder() {
                   </>
                 )}
               </button>
-              
+
               <button
                 type="button"
                 onClick={() => setViewMode('list')}
@@ -688,7 +688,7 @@ export default function ReportsBuilder() {
             </div>
 
             <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
-              <button 
+              <button
                 onClick={() => setViewMode('list')}
                 style={{
                   display: 'flex',
@@ -706,7 +706,7 @@ export default function ReportsBuilder() {
                 <ArrowLeft size={16} /> Back
               </button>
 
-              <button 
+              <button
                 onClick={handleExportCSV}
                 style={{
                   display: 'flex',
@@ -738,7 +738,7 @@ export default function ReportsBuilder() {
                     {/* Render Metrics */}
                     {reportDetails.report.metrics.map(met => (
                       <th key={met} className="text-right" style={{ width: colWidth, textTransform: 'capitalize' }}>
-                        {met === 'impressions_dfp' ? 'Inventory' : met === 'pub_revenues' ? 'Publisher Revenues (USD)' : met === 'pageview' ? 'Pageview' : 'VRPM'}
+                        {met === 'impressions_dfp' ? 'Inventory' : met === 'pub_revenues' ? 'Revenues (USD)' : met === 'pageview' ? 'Pageview' : 'VRPM'}
                       </th>
                     ))}
                   </tr>
@@ -858,7 +858,7 @@ export default function ReportsBuilder() {
                   <td style={{ width: '30%' }}>{formatDateField(report)}</td>
                   <td style={{ width: '30%', textAlign: 'center' }}>
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                      <button 
+                      <button
                         onClick={() => handleRunReport(report.id)}
                         style={{
                           background: 'none',
@@ -875,7 +875,7 @@ export default function ReportsBuilder() {
                         View
                       </button>
 
-                      <button 
+                      <button
                         onClick={() => handleInitEdit(report)}
                         style={{
                           background: 'none',
@@ -892,7 +892,7 @@ export default function ReportsBuilder() {
                         <Edit2 size={13} /> Edit
                       </button>
 
-                      <button 
+                      <button
                         onClick={() => handleDeleteReport(report.id, report.name)}
                         style={{
                           background: 'none',
