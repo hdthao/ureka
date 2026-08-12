@@ -32,7 +32,7 @@ export default function Login() {
         setError(res.error);
       }
     } catch (err) {
-      setError('Đã xảy ra lỗi kết nối.');
+      setError('A connection error occurred.');
     } finally {
       setLoading(false);
     }

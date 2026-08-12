@@ -284,14 +284,14 @@ export default function Dashboard() {
 
   const handleApplyFilter = () => {
     if (!tempStartDate || !tempEndDate) {
-      setError("Vui lòng chọn đầy đủ cả Ngày Bắt đầu và Ngày Kết thúc!");
+      setError("Please select both Start Date and End Date!");
       return;
     }
 
     const start = new Date(tempStartDate);
     const end = new Date(tempEndDate);
     if (start > end) {
-      setError("Ngày bắt đầu không được lớn hơn ngày kết thúc!");
+      setError("Start date cannot be later than end date!");
       return;
     }
 
@@ -389,15 +389,15 @@ export default function Dashboard() {
             <button
               className={`dropdown-btn ${dropdownOpen ? 'active' : ''}`}
               onClick={() => setDropdownOpen(!dropdownOpen)}
-              title="Lọc website"
+              title="Filter websites"
             >
               <Globe size={15} style={{ color: 'var(--color-accent)' }} />
               <span className="dropdown-btn-text">
                 {!selectedSites || selectedSites.length === allSites.length
-                  ? 'Tất cả website'
+                  ? 'All websites'
                   : selectedSites.length === 0
-                  ? 'Không website nào'
-                  : `Website (${selectedSites.length}/${allSites.length})`}
+                  ? 'No websites'
+                  : `Websites (${selectedSites.length}/${allSites.length})`}
               </span>
               <ChevronDown size={14} style={{
                 transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
@@ -415,7 +415,7 @@ export default function Dashboard() {
                   <input
                     type="text"
                     className="dropdown-search-input"
-                    placeholder="Tìm kiếm website..."
+                    placeholder="Search websites..."
                     value={siteSearchQuery}
                     onChange={(e) => setSiteSearchQuery(e.target.value)}
                   />
@@ -443,13 +443,13 @@ export default function Dashboard() {
                     className="dropdown-action-btn"
                     onClick={() => setSelectedSites(allSites)}
                   >
-                    Chọn tất cả
+                    Select all
                   </button>
                   <button
                     className="dropdown-action-btn"
                     onClick={() => setSelectedSites([])}
                   >
-                    Bỏ chọn hết
+                    Deselect all
                   </button>
                 </div>
 
@@ -471,7 +471,7 @@ export default function Dashboard() {
                       );
                     })
                   ) : (
-                    <div className="dropdown-no-results">Không tìm thấy website</div>
+                    <div className="dropdown-no-results">No websites found</div>
                   )}
                 </div>
               </div>
@@ -533,16 +533,16 @@ export default function Dashboard() {
       ) : selectedSites && selectedSites.length === 0 ? (
         <div className="dashboard-empty-state">
           <Globe size={48} style={{ color: 'var(--color-text-muted)', opacity: 0.5 }} />
-          <div className="dashboard-empty-state-title">Chưa chọn Website nào</div>
+          <div className="dashboard-empty-state-title">No websites selected</div>
           <p style={{ maxWidth: '400px', fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>
-            Vui lòng chọn ít nhất một website từ danh sách lọc ở trên để hiển thị dữ liệu thống kê và biểu đồ.
+            Please select at least one website from the filter list above to display statistics and charts.
           </p>
           <button
             className="retry-btn"
             onClick={() => setSelectedSites(allSites)}
             style={{ marginTop: '8px' }}
           >
-            Chọn tất cả website
+            Select all websites
           </button>
         </div>
       ) : (

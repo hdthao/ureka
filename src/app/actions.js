@@ -105,10 +105,10 @@ export async function loginAction(email, password) {
     if (response.data && response.data.status && response.data.token) {
       return { success: true, token: response.data.token };
     }
-    return { success: false, error: response.data.msg || 'Đăng nhập thất bại.' };
+    return { success: false, error: response.data.msg || 'Login failed.' };
   } catch (error) {
     console.error('Error in loginAction:', error);
-    return { success: false, error: error.message || 'Lỗi hệ thống khi đăng nhập.' };
+    return { success: false, error: error.message || 'System error during login.' };
   }
 }
 
@@ -127,10 +127,33 @@ export async function getReportAction(token, startDate, endDate) {
       }
     });
 
+    if (response.data && response.data.data && Array.isArray(response.data.data)) {
+      response.data.data = response.data.data.map(item => {
+        const modified = { ...item };
+        if (typeof modified.revenues === 'number') {
+          modified.revenues = modified.revenues * 0.8;
+        } else if (typeof modified.revenues === 'string') {
+          const num = parseFloat(modified.revenues);
+          if (!isNaN(num)) {
+            modified.revenues = num * 0.8;
+          }
+        }
+        if (typeof modified.vrpm === 'number') {
+          modified.vrpm = modified.vrpm * 0.8;
+        } else if (typeof modified.vrpm === 'string') {
+          const num = parseFloat(modified.vrpm);
+          if (!isNaN(num)) {
+            modified.vrpm = num * 0.8;
+          }
+        }
+        return modified;
+      });
+    }
+
     return response.data;
   } catch (error) {
     console.error('Error in getReportAction:', error);
-    throw new Error(error.message || 'Lỗi hệ thống khi lấy dữ liệu báo cáo.');
+    throw new Error(error.message || 'System error fetching report data.');
   }
 }
 
@@ -145,9 +168,124 @@ export async function getReportsListAction() {
 
 export async function getReportDetailsAction(reportId) {
   try {
-    return await fetchWithSession(`https://ssp.urekamedia.com/auth/api/reports/reports/get_report_data?id=${reportId}`);
+    const data = await fetchWithSession(`https://ssp.urekamedia.com/auth/api/reports/reports/get_report_data?id=${reportId}`);
+    if (data && data.status) {
+      if (Array.isArray(data.result)) {
+        data.result = data.result.map(item => {
+          const modified = { ...item };
+          if (typeof modified.pub_revenues === 'number') {
+            modified.pub_revenues = modified.pub_revenues * 0.8;
+          } else if (typeof modified.pub_revenues === 'string') {
+            const num = parseFloat(modified.pub_revenues);
+            if (!isNaN(num)) {
+              modified.pub_revenues = num * 0.8;
+            }
+          }
+          if (typeof modified.vrpm === 'number') {
+            modified.vrpm = modified.vrpm * 0.8;
+          } else if (typeof modified.vrpm === 'string') {
+            const num = parseFloat(modified.vrpm);
+            if (!isNaN(num)) {
+              modified.vrpm = num * 0.8;
+            }
+          }
+          return modified;
+        });
+      }
+      if (data.summary) {
+        if (typeof data.summary.pub_revenues === 'number') {
+          data.summary.pub_revenues = data.summary.pub_revenues * 0.8;
+        } else if (typeof data.summary.pub_revenues === 'string') {
+          const num = parseFloat(data.summary.pub_revenues);
+          if (!isNaN(num)) {
+            data.summary.pub_revenues = num * 0.8;
+          }
+        }
+        if (typeof data.summary.vrpm === 'number') {
+          data.summary.vrpm = data.summary.vrpm * 0.8;
+        } else if (typeof data.summary.vrpm === 'string') {
+          const num = parseFloat(data.summary.vrpm);
+          if (!isNaN(num)) {
+            data.summary.vrpm = num * 0.8;
+          }
+        }
+      }
+    }
+    return data;
   } catch (err) {
     console.error("Error in getReportDetailsAction:", err.message);
+    return { status: false, error: err.message };
+  }
+}
+
+async function postWithSession(url, postData) {
+  let cookies = await getWebSessionCookies();
+  
+  const getCsrf = async (cookieStr) => {
+    const res = await axios.get('https://ssp.urekamedia.com/auth/reports/reports', {
+      headers: { 'Cookie': cookieStr }
+    });
+    const match = res.data.match(/name="csrf-token"\s+content="([^"]+)"/);
+    return match ? match[1] : null;
+  };
+
+  let csrfToken = await getCsrf(cookies);
+  
+  let response;
+  try {
+    response = await axios.post(url, postData, {
+      headers: {
+        'Cookie': cookies,
+        'X-CSRF-TOKEN': csrfToken,
+        'Content-Type': 'application/json'
+      }
+    });
+  } catch (err) {
+    const status = err.response ? err.response.status : 0;
+    if (status === 400 || status === 419 || status === 401) {
+      console.log("POST session expired or CSRF token mismatch. Re-authenticating...");
+      cachedCookies = null;
+      cachedCookiesTime = 0;
+      cookies = await getWebSessionCookies();
+      csrfToken = await getCsrf(cookies);
+      response = await axios.post(url, postData, {
+        headers: {
+          'Cookie': cookies,
+          'X-CSRF-TOKEN': csrfToken,
+          'Content-Type': 'application/json'
+        }
+      });
+    } else {
+      throw err;
+    }
+  }
+  
+  return response.data;
+}
+
+export async function createReportAction(reportData) {
+  try {
+    return await postWithSession('https://ssp.urekamedia.com/auth/api/reports/reports/store', reportData);
+  } catch (err) {
+    console.error("Error in createReportAction:", err.message);
+    return { status: false, error: err.message };
+  }
+}
+
+export async function updateReportAction(reportData) {
+  try {
+    return await postWithSession('https://ssp.urekamedia.com/auth/api/reports/reports/update', reportData);
+  } catch (err) {
+    console.error("Error in updateReportAction:", err.message);
+    return { status: false, error: err.message };
+  }
+}
+
+export async function deleteReportAction(reportId) {
+  try {
+    return await fetchWithSession(`https://ssp.urekamedia.com/auth/api/reports/reports/delete?id=${reportId}`);
+  } catch (err) {
+    console.error("Error in deleteReportAction:", err.message);
     return { status: false, error: err.message };
   }
 }
