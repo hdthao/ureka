@@ -7,7 +7,7 @@ import {
 } from 'recharts';
 import { Calendar, Globe, ChevronDown, Check, Search, X, Loader2 } from 'lucide-react';
 import { getReportAction } from '../app/actions';
-import { eachDayOfInterval, format, parseISO, subDays } from 'date-fns';
+import { eachDayOfInterval, format, parseISO, subDays, differenceInCalendarDays } from 'date-fns';
 
 // Helper function to generate default date range (7 days up to today)
 const getInitialDates = () => {
@@ -18,18 +18,24 @@ const getInitialDates = () => {
 };
 
 // Component for Individual Stat Card
-const StatCard = ({ title, mainValue, subValue, change }) => (
-  <div className="stat-card">
-    <div className="stat-title">{title}</div>
-    <div className="stat-value">{mainValue}</div>
-    {subValue && <div className="stat-subvalue">{subValue}</div>}
-    {change !== undefined && (
-      <div className={`stat-change ${change > 0 ? 'positive' : 'neutral'}`}>
-        {change}%
-      </div>
-    )}
-  </div>
-);
+const StatCard = ({ title, mainValue, subValue, change }) => {
+  const isPositive = change > 0;
+  const isNegative = change < 0;
+  const absValue = Math.abs(change || 0).toFixed(2);
+
+  return (
+    <div className="stat-card">
+      <div className="stat-title">{title}</div>
+      <div className="stat-value">{mainValue}</div>
+      {subValue && <div className="stat-subvalue">{subValue}</div>}
+      {change !== undefined && (
+        <div className={`stat-change ${isPositive ? 'positive' : isNegative ? 'negative' : 'neutral'}`}>
+          {isPositive ? `${absValue}% ↑` : isNegative ? `${absValue}% ↓` : `0%`}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function Dashboard() {
   const [data, setData] = useState([]);
@@ -84,7 +90,14 @@ export default function Dashboard() {
         return;
       }
 
-      const apiStartDate = startStr.replace(/-/g, '/');
+      // Calculate previous period of equal duration for growth comparison
+      const startDate = parseISO(startStr);
+      const endDate = parseISO(endStr);
+      const durationDays = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
+      const fetchStartObj = subDays(startDate, durationDays);
+
+      const fetchStartStr = format(fetchStartObj, 'yyyy-MM-dd');
+      const apiStartDate = fetchStartStr.replace(/-/g, '/');
       const apiEndDate = endStr.replace(/-/g, '/');
 
       const res = await getReportAction(token, apiStartDate, apiEndDate);
@@ -173,8 +186,33 @@ export default function Dashboard() {
     return data.filter(item => selectedSites.includes(item.sites_name));
   }, [data, selectedSites]);
 
+  const prevPeriod = useMemo(() => {
+    try {
+      const startDate = parseISO(appliedStartDate);
+      const endDate = parseISO(appliedEndDate);
+      const durationDays = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
+      const prevEndDateObj = subDays(startDate, 1);
+      const prevStartDateObj = subDays(startDate, durationDays);
+      return {
+        start: format(prevStartDateObj, 'yyyy-MM-dd'),
+        end: format(prevEndDateObj, 'yyyy-MM-dd')
+      };
+    } catch (e) {
+      return { start: appliedStartDate, end: appliedEndDate };
+    }
+  }, [appliedStartDate, appliedEndDate]);
+
+  // Filtered data based on selection
+  const filteredData = useMemo(() => {
+    if (!selectedSites) return data;
+    return data.filter(item => selectedSites.includes(item.sites_name));
+  }, [data, selectedSites]);
+
   // Compute Aggregates
   const { summary, dailyData, siteData, formatData } = useMemo(() => {
+    const currentData = filteredData.filter(item => item.date >= appliedStartDate && item.date <= appliedEndDate);
+    const prevData = filteredData.filter(item => item.date >= prevPeriod.start && item.date <= prevPeriod.end);
+
     let inventoryTotal = 0;
     let revenuesTotal = 0;
     let pageviewTotal = 0;
@@ -184,7 +222,7 @@ export default function Dashboard() {
     const formatMap = {};
     const seenSiteDate = new Set();
 
-    filteredData.forEach(item => {
+    currentData.forEach(item => {
       // Summary Inventory & Revenues (sum of all adunit records)
       inventoryTotal += item.inventory || 0;
       revenuesTotal += item.revenues || 0;
@@ -220,6 +258,39 @@ export default function Dashboard() {
       formatMap[format]['Series 1'] += item.inventory || 0;
     });
 
+    // Previous period metrics
+    let prevInventoryTotal = 0;
+    let prevRevenuesTotal = 0;
+    let prevPageviewTotal = 0;
+    const prevSeenSiteDate = new Set();
+
+    prevData.forEach(item => {
+      prevInventoryTotal += item.inventory || 0;
+      prevRevenuesTotal += item.revenues || 0;
+
+      const siteDateKey = `${item.sites_name}_${item.date}`;
+      if (!prevSeenSiteDate.has(siteDateKey)) {
+        prevSeenSiteDate.add(siteDateKey);
+        prevPageviewTotal += item.pageview || 0;
+      }
+    });
+
+    const calcChange = (curr, prev) => {
+      if (prev > 0) {
+        return ((curr - prev) / prev) * 100;
+      }
+      if (curr > 0) return 100;
+      return 0;
+    };
+
+    const inventoryChange = calcChange(inventoryTotal, prevInventoryTotal);
+    const revenuesChange = calcChange(revenuesTotal, prevRevenuesTotal);
+    const pageviewChange = calcChange(pageviewTotal, prevPageviewTotal);
+
+    const currentVRPMVal = pageviewTotal > 0 ? (revenuesTotal / pageviewTotal) * 1000 : 0;
+    const prevVRPMVal = prevPageviewTotal > 0 ? (prevRevenuesTotal / prevPageviewTotal) * 1000 : 0;
+    const vrpmChange = calcChange(currentVRPMVal, prevVRPMVal);
+
     // Format Pageview main value (e.g. 3.52k) and sub value (e.g. 3,518)
     const pageviewMain = pageviewTotal >= 1000
       ? (pageviewTotal / 1000).toFixed(2) + 'k'
@@ -228,12 +299,12 @@ export default function Dashboard() {
 
     // Format Inventory main value (e.g. 14.73k) and sub value (e.g. 14,731)
     const inventoryMain = inventoryTotal >= 1000
-      ? (inventoryTotal / 1000).toFixed(3) + 'k'
+      ? (inventoryTotal / 1000).toFixed(2) + 'k'
       : inventoryTotal.toString();
     const inventorySub = inventoryTotal.toLocaleString('en-US');
 
     // VRPM = (Revenues / Pageview) * 1000
-    const vrpmValue = pageviewTotal > 0 ? ((revenuesTotal / pageviewTotal) * 1000).toFixed(2) : '0.00';
+    const vrpmValue = currentVRPMVal.toFixed(2);
 
     // Populate all dates in the range with 0 if no data exists in dailyMap
     let dailyList = [];
@@ -275,17 +346,21 @@ export default function Dashboard() {
       summary: {
         inventory: inventoryMain,
         inventoryRaw: inventorySub,
+        inventoryChange,
         revenues: revenuesTotal.toFixed(2) + ' $',
-        revenuesRaw: revenuesTotal.toFixed(2),
+        revenuesRaw: revenuesTotal.toFixed(2) + ' $',
+        revenuesChange,
         pageview: pageviewMain,
         pageviewSub: pageviewSub,
-        vrpm: vrpmValue
+        pageviewChange,
+        vrpm: vrpmValue,
+        vrpmChange
       },
       dailyData: dailyList,
       siteData: Object.values(siteMap),
       formatData: Object.values(formatMap)
     };
-  }, [filteredData, appliedStartDate, appliedEndDate]);
+  }, [filteredData, appliedStartDate, appliedEndDate, prevPeriod]);
 
   const handleApplyFilter = () => {
     if (!tempStartDate || !tempEndDate) {
@@ -557,25 +632,25 @@ export default function Dashboard() {
               title="Inventory"
               mainValue={summary.inventory}
               subValue={summary.inventoryRaw}
-              change={0}
+              change={summary.inventoryChange}
             />
             <StatCard
               title="Publisher's Revenues (USD)"
               mainValue={summary.revenues}
               subValue={summary.revenuesRaw}
-              change={0}
+              change={summary.revenuesChange}
             />
             <StatCard
               title="Pageview"
               mainValue={summary.pageview}
               subValue={summary.pageviewSub}
-              change={0}
+              change={summary.pageviewChange}
             />
             <StatCard
               title="VRPM"
               mainValue={summary.vrpm}
               subValue={summary.vrpm}
-              change={0}
+              change={summary.vrpmChange}
             />
           </div>
 

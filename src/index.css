@@ -240,6 +240,7 @@ body {
   font-weight: 600;
 }
 .stat-change.positive { color: var(--chart-success); }
+.stat-change.negative { color: #f44336; }
 .stat-change.neutral { color: var(--color-text-muted); }
 
 /* Charts */
