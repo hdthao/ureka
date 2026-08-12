@@ -94,6 +94,11 @@ function sanitizeReportFilters(filters, allowedSiteIds) {
   return sanitized.length > 0 ? sanitized : allowedSiteIds;
 }
 
+function filterRecordsBySiteIds(records, siteIds) {
+  const allowedSiteNames = siteIds.map(id => SITE_NAME_BY_ID[id]).filter(Boolean);
+  return records.filter(record => allowedSiteNames.includes(record.sites_name));
+}
+
 export async function getAllowedSitesAction() {
   try {
     await connectDB();
@@ -153,6 +158,9 @@ export async function logoutAction() {
 // Server Action: Fetch raw performance report from SSP (reduced by 20%)
 export async function getReportAction(token, startDate, endDate) {
   try {
+    await connectDB();
+    const user = await getCurrentUser();
+    const allowedSiteIds = getAllowedSiteIds(user);
     const apiStartDate = startDate.replace(/-/g, '/');
     const apiEndDate = endDate.replace(/-/g, '/');
 
@@ -189,6 +197,7 @@ export async function getReportAction(token, startDate, endDate) {
         }
         return modified;
       });
+      response.data.data = filterRecordsBySiteIds(response.data.data, allowedSiteIds);
     }
 
     return response.data;
