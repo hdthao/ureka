@@ -29,6 +29,17 @@ const AVAILABLE_METRICS = [
   { key: 'vrpm', label: 'VRPM' }
 ];
 
+function formatReportCode(id) {
+  if (!id) return 'RPT-UNKNOWN';
+
+  let hash = 0;
+  for (let i = 0; i < id.length; i += 1) {
+    hash = ((hash << 5) - hash + id.charCodeAt(i)) >>> 0;
+  }
+
+  return `RPT-${hash.toString(36).toUpperCase().padStart(7, '0')}`;
+}
+
 export default function ReportsBuilder() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -809,8 +820,8 @@ export default function ReportsBuilder() {
           <table className="data-table" style={{ tableLayout: 'fixed', width: '100%' }}>
             <thead>
               <tr>
-                <th style={{ width: '10%' }}>ID</th>
-                <th style={{ width: '30%' }}>Name</th>
+                <th style={{ width: '18%' }}>Report ID</th>
+                <th style={{ width: '22%' }}>Name</th>
                 <th style={{ width: '30%' }}>Date</th>
                 <th style={{ width: '30%', textAlign: 'center' }}>Actions</th>
               </tr>
@@ -818,8 +829,10 @@ export default function ReportsBuilder() {
             <tbody>
               {reports.map((report) => (
                 <tr key={report.id}>
-                  <td style={{ width: '10%', fontWeight: 600, color: 'var(--color-text-muted)' }}>{report.id}</td>
-                  <td style={{ width: '30%', fontWeight: 600, color: 'var(--color-text-main)' }}>{report.name}</td>
+                  <td style={{ width: '18%', fontWeight: 700, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                    {formatReportCode(report.id)}
+                  </td>
+                  <td style={{ width: '22%', fontWeight: 600, color: 'var(--color-text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{report.name}</td>
                   <td style={{ width: '30%' }}>{formatDateField(report)}</td>
                   <td style={{ width: '30%', textAlign: 'center' }}>
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
