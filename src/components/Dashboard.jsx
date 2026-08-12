@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
-import { Calendar, Globe, ChevronDown, Check, Search, X } from 'lucide-react';
+import { Calendar, Globe, ChevronDown, Check, Search, X, Loader2 } from 'lucide-react';
 import { getReportAction } from '../app/actions';
 import { eachDayOfInterval, format, parseISO, subDays } from 'date-fns';
 
@@ -377,14 +377,7 @@ export default function Dashboard() {
     );
   };
 
-  if (loading && data.length === 0) {
-    return (
-      <div className="loading-screen">
-        <div className="spinner"></div>
-        <p>Loading Dashboard Data...</p>
-      </div>
-    );
-  }
+
 
   return (
     <div className="main-content">
@@ -507,25 +500,42 @@ export default function Dashboard() {
           </div>
           <button
             onClick={handleApplyFilter}
-            disabled={!tempStartDate || !tempEndDate}
+            disabled={!tempStartDate || !tempEndDate || loading}
             style={{
               padding: '6px 16px',
-              background: (!tempStartDate || !tempEndDate) ? '#ccc' : 'var(--color-accent)',
+              background: (!tempStartDate || !tempEndDate || loading) ? '#ccc' : 'var(--color-accent)',
               color: 'white',
               border: 'none',
               borderRadius: '4px',
-              cursor: (!tempStartDate || !tempEndDate) ? 'not-allowed' : 'pointer',
-              fontWeight: 600
+              cursor: (!tempStartDate || !tempEndDate || loading) ? 'not-allowed' : 'pointer',
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              minWidth: '76px'
             }}
           >
-            Apply
+            {loading ? (
+              <>
+                <Loader2 size={16} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
+                <span>Apply</span>
+              </>
+            ) : (
+              'Apply'
+            )}
           </button>
         </div>
       </div>
 
       {error && <div className="login-error" style={{ marginBottom: '20px' }}>{error}</div>}
 
-      {selectedSites && selectedSites.length === 0 ? (
+      {loading ? (
+        <div className="loading-screen" style={{ minHeight: '400px', height: 'auto', padding: '60px 0' }}>
+          <div className="spinner"></div>
+          <p>Loading Dashboard Data...</p>
+        </div>
+      ) : selectedSites && selectedSites.length === 0 ? (
         <div className="dashboard-empty-state">
           <Globe size={48} style={{ color: 'var(--color-text-muted)', opacity: 0.5 }} />
           <div className="dashboard-empty-state-title">Chưa chọn Website nào</div>
