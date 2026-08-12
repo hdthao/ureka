@@ -1,31 +1,13 @@
 import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
-
-let mongoServer;
 
 export async function connectDB() {
   if (mongoose.connection.readyState >= 1) {
     return;
   }
 
-  let uri = process.env.MONGODB_URI;
-
+  const uri = process.env.MONGODB_URI;
   if (!uri) {
-    if (!global.__mongoMemoryServer__) {
-      console.log('Starting MongoDB Memory Server...');
-      try {
-        mongoServer = await MongoMemoryServer.create();
-        uri = mongoServer.getUri();
-        global.__mongoMemoryServer__ = mongoServer;
-        global.__mongoUri__ = uri;
-        console.log('MongoDB Memory Server started at:', uri);
-      } catch (err) {
-        console.error('Failed to start MongoDB Memory Server:', err.message);
-        throw err;
-      }
-    } else {
-      uri = global.__mongoUri__;
-    }
+    throw new Error('MONGODB_URI environment variable is required. Add it to your local .env and Vercel Environment Variables.');
   }
 
   try {

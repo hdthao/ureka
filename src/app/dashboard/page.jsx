@@ -7,9 +7,21 @@ import Dashboard from '../../components/Dashboard';
 import ReportsBuilder from '../../components/ReportsBuilder';
 import { logoutAction } from '../actions';
 
+function getEmailFromToken(token) {
+  try {
+    const [payload] = token.split('.');
+    const decodedPayload = JSON.parse(atob(payload));
+    return decodedPayload.email || '';
+  } catch (error) {
+    console.error('Failed to read user from token:', error);
+    return '';
+  }
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [token, setToken] = useState(null);
+  const [userEmail, setUserEmail] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
 
@@ -19,6 +31,7 @@ export default function DashboardPage() {
       router.push('/');
     } else {
       setToken(t);
+      setUserEmail(getEmailFromToken(t));
     }
   }, [router]);
 
@@ -67,11 +80,12 @@ export default function DashboardPage() {
           </a>
         </nav>
 
-        <div className="user-profile">
-          <span>Hoangnam Social 2</span>
+        <div className="user-profile" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span>{userEmail || 'User'}</span>
           <div className="avatar">
             <User size={18} />
           </div>
+          
           <button 
             onClick={handleLogout} 
             title="Logout"
@@ -83,7 +97,6 @@ export default function DashboardPage() {
               display: 'flex', 
               alignItems: 'center', 
               gap: '6px',
-              marginLeft: '16px',
               padding: '6px 12px',
               borderRadius: '4px',
               fontSize: '0.85rem',
