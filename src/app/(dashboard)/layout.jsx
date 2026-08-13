@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { User, LogOut, Menu, X } from 'lucide-react';
-import Dashboard from '../../components/Dashboard';
-import ReportsBuilder from '../../components/ReportsBuilder';
 import { logoutAction } from '../actions';
 
 function getEmailFromToken(token) {
@@ -18,12 +17,12 @@ function getEmailFromToken(token) {
   }
 }
 
-export default function DashboardPage() {
+export default function DashboardLayout({ children }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [token, setToken] = useState(null);
   const [userEmail, setUserEmail] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('dashboard');
 
   useEffect(() => {
     const t = localStorage.getItem('ureka_token');
@@ -64,20 +63,20 @@ export default function DashboardPage() {
 
         {/* Navigation Links */}
         <nav className={`nav-links ${menuOpen ? 'open' : ''}`}>
-          <a 
-            href="#" 
-            className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('dashboard'); setMenuOpen(false); }}
+          <Link 
+            href="/dashboard"
+            className={`nav-item ${pathname === '/dashboard' ? 'active' : ''}`}
+            onClick={() => setMenuOpen(false)}
           >
             Dashboard
-          </a>
-          <a 
-            href="#" 
-            className={`nav-item ${activeTab === 'reports-builder' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('reports-builder'); setMenuOpen(false); }}
+          </Link>
+          <Link 
+            href="/reports-builder"
+            className={`nav-item ${pathname === '/reports-builder' ? 'active' : ''}`}
+            onClick={() => setMenuOpen(false)}
           >
             Reports Builder
-          </a>
+          </Link>
         </nav>
 
         <div className="user-profile" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -112,7 +111,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {activeTab === 'dashboard' ? <Dashboard /> : <ReportsBuilder />}
+      {children}
     </div>
   );
 }
