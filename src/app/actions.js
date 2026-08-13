@@ -479,3 +479,29 @@ export async function deleteReportAction(reportId) {
     return { status: false, error: err.message === 'Unauthorized' ? 'Session expired. Please log in again.' : err.message };
   }
 }
+
+// Server Action: Change user password
+export async function changePasswordAction(newPassword) {
+  try {
+    if (!newPassword || newPassword.length < 8) {
+      return { status: false, error: 'Password must be at least 8 characters long.' };
+    }
+
+    await connectDB();
+    const userId = await getCurrentUserId();
+    
+    // Hash the new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    
+    const user = await User.findByIdAndUpdate(userId, { password: hashedPassword });
+    if (!user) {
+      return { status: false, error: 'User not found.' };
+    }
+
+    return { status: true };
+  } catch (err) {
+    console.error("Error in changePasswordAction:", err.message);
+    return { status: false, error: err.message === 'Unauthorized' ? 'Session expired. Please log in again.' : err.message };
+  }
+}

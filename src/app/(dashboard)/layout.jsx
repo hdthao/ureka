@@ -77,6 +77,13 @@ export default function DashboardLayout({ children }) {
           >
             Reports Builder
           </Link>
+          <Link 
+            href="/account"
+            className={`nav-item ${pathname === '/account' ? 'active' : ''}`}
+            onClick={() => setMenuOpen(false)}
+          >
+            Account
+          </Link>
         </nav>
 
         <div className="user-profile" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
