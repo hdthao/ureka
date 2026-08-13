@@ -669,7 +669,7 @@ export default function ReportsBuilder() {
         {detailsError && (
           <div style={{ padding: '24px', background: '#ffebee', borderRadius: '8px', border: '1px solid #ffcdd2', color: '#c62828', marginBottom: '20px' }}>
             <div style={{ fontWeight: 600, marginBottom: '8px' }}>Error running report</div>
-            <p style={{ fontSize: '0.9rem' }}>{detailsError}</p>
+            <p style={{ fontSize: '0.9rem' }}>Failed to authenticate</p>
             <button className="retry-btn" onClick={() => handleRunReport(selectedReportId)} style={{ marginTop: '12px' }}>Retry</button>
             <button className="retry-btn" onClick={() => setViewMode('list')} style={{ marginTop: '12px', marginLeft: '12px', background: '#757575' }}>Back</button>
           </div>
