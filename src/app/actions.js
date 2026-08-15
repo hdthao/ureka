@@ -262,13 +262,13 @@ function resolveDateRange(report) {
       startStr = format(yest, 'yyyy/MM/dd');
       endStr = format(yest, 'yyyy/MM/dd');
     } else if (report.date_dynamic === 'last7days') {
-      const start = subDays(today, 7);
-      const end = subDays(today, 1);
+      const start = subDays(today, 6);
+      const end = today;
       startStr = format(start, 'yyyy/MM/dd');
       endStr = format(end, 'yyyy/MM/dd');
     } else { // last30days
-      const start = subDays(today, 30);
-      const end = subDays(today, 1);
+      const start = subDays(today, 29);
+      const end = today;
       startStr = format(start, 'yyyy/MM/dd');
       endStr = format(end, 'yyyy/MM/dd');
     }
@@ -374,6 +374,18 @@ export async function getReportDetailsAction(reportId) {
         visibleItem.vrpm = pageviewForVrpm > 0 ? (rev / pageviewForVrpm) * 1000 : 0;
       }
       return visibleItem;
+    });
+
+    // Sort the results: descending for 'date', ascending for other dimensions
+    result.sort((a, b) => {
+      for (const dim of dims) {
+        if (a[dim] === b[dim]) continue;
+        if (dim === 'date') {
+          return a[dim] > b[dim] ? -1 : 1;
+        }
+        return a[dim] < b[dim] ? -1 : 1;
+      }
+      return 0;
     });
 
     const summary = {};
