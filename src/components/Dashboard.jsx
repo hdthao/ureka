@@ -237,7 +237,7 @@ export default function Dashboard() {
 
     // Format Inventory main value (e.g. 14.73k) and sub value (e.g. 14,731)
     const inventoryMain = inventoryTotal >= 1000
-      ? (inventoryTotal / 1000).toFixed(3) + 'k'
+      ? (inventoryTotal / 1000).toFixed(2) + 'k'
       : inventoryTotal.toString();
     const inventorySub = inventoryTotal.toLocaleString('en-US');
 

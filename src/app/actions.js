@@ -177,8 +177,17 @@ export async function getReportAction(token, startDate, endDate) {
     });
 
     if (response.data && response.data.data && Array.isArray(response.data.data)) {
+      // Sort by pageview descending so that deduplication logic picks the row with actual pageviews first
+      response.data.data.sort((a, b) => (Number(b.pageview) || 0) - (Number(a.pageview) || 0));
+
       response.data.data = response.data.data.map(item => {
         const modified = { ...item };
+        
+        // Merge mobile traffic prefix 'm.' into the base site name
+        if (modified.sites_name && modified.sites_name.startsWith('m.')) {
+          modified.sites_name = modified.sites_name.substring(2);
+        }
+
         if (typeof modified.revenues === 'number') {
           modified.revenues = modified.revenues * 0.8;
         } else if (typeof modified.revenues === 'string') {
