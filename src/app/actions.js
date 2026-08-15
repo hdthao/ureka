@@ -182,10 +182,17 @@ export async function getReportAction(token, startDate, endDate) {
 
       response.data.data = response.data.data.map(item => {
         const modified = { ...item };
-        
-        // Merge mobile traffic prefix 'm.' into the base site name
+
+        // Merge mobile traffic prefix 'm.' into the base site name,
+        // ONLY if the base site is in the catalog and the mobile site isn't explicitly listed.
         if (modified.sites_name && modified.sites_name.startsWith('m.')) {
-          modified.sites_name = modified.sites_name.substring(2);
+          const isMobileExplicit = SITE_CATALOG.some(site => site.name === modified.sites_name);
+          if (!isMobileExplicit) {
+            const baseName = modified.sites_name.substring(2);
+            if (SITE_CATALOG.some(site => site.name === baseName)) {
+              modified.sites_name = baseName;
+            }
+          }
         }
 
         if (typeof modified.revenues === 'number') {
@@ -223,9 +230,9 @@ export async function getReportsListAction() {
     const user = await getCurrentUser();
     const userId = user._id;
     const allowedSiteIds = getAllowedSiteIds(user);
-    
+
     const list = await Report.find({ userId }).sort({ createdAt: -1 });
-    
+
     // Map _id to id for frontend compatibility
     const mappedList = list.map(item => ({
       id: item._id.toString(),
@@ -251,8 +258,9 @@ export async function getReportsListAction() {
 // Helper: Resolve dynamic date ranges
 function resolveDateRange(report) {
   let startStr, endStr;
-  const today = new Date();
-  
+  const todayStr = new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' });
+  const today = new Date(todayStr);
+
   if (report.date_range_type === 'dynamic') {
     if (report.date_dynamic === 'today') {
       startStr = format(today, 'yyyy/MM/dd');
@@ -510,11 +518,11 @@ export async function changePasswordAction(newPassword) {
 
     await connectDB();
     const userId = await getCurrentUserId();
-    
+
     // Hash the new password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
-    
+
     const user = await User.findByIdAndUpdate(userId, { password: hashedPassword });
     if (!user) {
       return { status: false, error: 'User not found.' };

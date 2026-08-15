@@ -192,10 +192,10 @@ export default function Dashboard() {
     const siteMap = {};
     const formatMap = {};
     const seenSiteDate = new Set();
-
     filteredData.forEach(item => {
+      const itemInventory = Number(item.impressions_dfp ?? item.inventory ?? item.impressions ?? 0);
       // Summary Inventory & Revenues (sum of all adunit records)
-      inventoryTotal += item.inventory || 0;
+      inventoryTotal += itemInventory;
       revenuesTotal += item.revenues || 0;
 
       // Summary Pageview (unique per site + date)
@@ -208,7 +208,7 @@ export default function Dashboard() {
       // Daily
       const date = item.date;
       if (!dailyMap[date]) dailyMap[date] = { name: date, Inventory: 0, 'Revenues (USD)': 0 };
-      dailyMap[date].Inventory += item.inventory || 0;
+      dailyMap[date].Inventory += itemInventory;
       dailyMap[date]['Revenues (USD)'] += item.revenues || 0;
 
       // Site
@@ -226,7 +226,7 @@ export default function Dashboard() {
       const format = item.adunits_name ? item.adunits_name.split('_')[0] : 'Unknown';
       if (!formatMap[format]) formatMap[format] = { name: format, 'Series 1': 0, 'Revenues (USD)': 0 };
       formatMap[format]['Revenues (USD)'] += item.revenues || 0;
-      formatMap[format]['Series 1'] += item.inventory || 0;
+      formatMap[format]['Series 1'] += itemInventory;
     });
 
     // Format Pageview main value (e.g. 3.52k) and sub value (e.g. 3,518)
