@@ -6,14 +6,13 @@ import Link from 'next/link';
 import { User, LogOut, Menu, X } from 'lucide-react';
 import { logoutAction } from '../actions';
 
-function getEmailFromToken(token) {
+function getPayloadFromToken(token) {
   try {
     const [payload] = token.split('.');
-    const decodedPayload = JSON.parse(atob(payload));
-    return decodedPayload.email || '';
+    return JSON.parse(atob(payload));
   } catch (error) {
-    console.error('Failed to read user from token:', error);
-    return '';
+    console.error('Failed to read payload from token:', error);
+    return {};
   }
 }
 
@@ -22,6 +21,7 @@ export default function DashboardLayout({ children }) {
   const pathname = usePathname();
   const [token, setToken] = useState(null);
   const [userEmail, setUserEmail] = useState('');
+  const [userRole, setUserRole] = useState('user');
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -30,7 +30,9 @@ export default function DashboardLayout({ children }) {
       router.push('/');
     } else {
       setToken(t);
-      setUserEmail(getEmailFromToken(t));
+      const payload = getPayloadFromToken(t);
+      setUserEmail(payload.email || '');
+      setUserRole(payload.role || 'user');
     }
   }, [router]);
 
@@ -63,20 +65,39 @@ export default function DashboardLayout({ children }) {
 
         {/* Navigation Links */}
         <nav className={`nav-links ${menuOpen ? 'open' : ''}`}>
-          <Link 
-            href="/dashboard"
-            className={`nav-item ${pathname === '/dashboard' ? 'active' : ''}`}
-            onClick={() => setMenuOpen(false)}
-          >
-            Dashboard
-          </Link>
-          <Link 
-            href="/reports-builder"
-            className={`nav-item ${pathname === '/reports-builder' ? 'active' : ''}`}
-            onClick={() => setMenuOpen(false)}
-          >
-            Reports Builder
-          </Link>
+          {userRole !== 'admin' ? (
+            <>
+              <Link 
+                href="/dashboard"
+                className={`nav-item ${pathname === '/dashboard' ? 'active' : ''}`}
+                onClick={() => setMenuOpen(false)}
+              >
+                Dashboard
+              </Link>
+              <Link 
+                href="/reports-builder"
+                className={`nav-item ${pathname === '/reports-builder' ? 'active' : ''}`}
+                onClick={() => setMenuOpen(false)}
+              >
+                Reports Builder
+              </Link>
+              <Link 
+                href="/payouts"
+                className={`nav-item ${pathname === '/payouts' ? 'active' : ''}`}
+                onClick={() => setMenuOpen(false)}
+              >
+                Payouts
+              </Link>
+            </>
+          ) : (
+            <Link 
+              href="/admin/payouts"
+              className={`nav-item ${pathname === '/admin/payouts' ? 'active' : ''}`}
+              onClick={() => setMenuOpen(false)}
+            >
+              Admin Payouts
+            </Link>
+          )}
           <Link 
             href="/account"
             className={`nav-item ${pathname === '/account' ? 'active' : ''}`}

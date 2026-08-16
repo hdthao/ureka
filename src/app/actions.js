@@ -8,6 +8,7 @@ import { subDays, format } from 'date-fns';
 import { connectDB } from '../lib/db';
 import User from '../models/User';
 import Report from '../models/Report';
+import Payout from '../models/Payout';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'ureka_super_secret_key_123';
 
@@ -56,8 +57,8 @@ async function getSSPToken() {
 }
 
 // Helpers: Local JWT Token implementation using native Node.js crypto
-function generateLocalToken(userId, email) {
-  const payload = JSON.stringify({ userId, email, exp: Date.now() + 1000 * 60 * 60 * 24 * 7 });
+function generateLocalToken(userId, email, role = 'user') {
+  const payload = JSON.stringify({ userId, email, role, exp: Date.now() + 1000 * 60 * 60 * 24 * 7 });
   const hmac = crypto.createHmac('sha256', JWT_SECRET);
   hmac.update(payload);
   const signature = hmac.digest('hex');
@@ -136,7 +137,7 @@ export async function loginAction(email, password) {
       path: '/'
     });
 
-    const token = generateLocalToken(user._id.toString(), user.email);
+    const token = generateLocalToken(user._id.toString(), user.email, user.role);
     return { success: true, token };
   } catch (err) {
     console.error('Error in loginAction:', err);
@@ -535,6 +536,233 @@ export async function changePasswordAction(newPassword) {
     return { status: true };
   } catch (err) {
     console.error("Error in changePasswordAction:", err.message);
+    return { status: false, error: err.message === 'Unauthorized' ? 'Session expired. Please log in again.' : err.message };
+  }
+}
+
+// Server Action: Get User Profile (includes payment info and role)
+export async function getUserProfileAction() {
+  try {
+    await connectDB();
+    const user = await getCurrentUser();
+    return { 
+      status: true, 
+      user: {
+        email: user.email,
+        role: user.role,
+        paymentInfo: user.paymentInfo
+      }
+    };
+  } catch (err) {
+    console.error("Error in getUserProfileAction:", err.message);
+    return { status: false, error: err.message === 'Unauthorized' ? 'Session expired. Please log in again.' : err.message };
+  }
+}
+
+// Server Action: Update Payment Info
+export async function updatePaymentInfoAction(paymentInfo) {
+  try {
+    await connectDB();
+    const userId = await getCurrentUserId();
+    
+    await User.findByIdAndUpdate(userId, { paymentInfo });
+    return { status: true };
+  } catch (err) {
+    console.error("Error in updatePaymentInfoAction:", err.message);
+    return { status: false, error: err.message === 'Unauthorized' ? 'Session expired. Please log in again.' : err.message };
+  }
+}
+
+// Server Action: Request Payout
+export async function requestPayoutAction(sitesBreakdown, paymentMethod, startDate, endDate) {
+  try {
+    await connectDB();
+    const userId = await getCurrentUserId();
+    
+    if (!sitesBreakdown || !Array.isArray(sitesBreakdown) || sitesBreakdown.length === 0) {
+      return { status: false, error: 'Invalid payout amount or no sites data.' };
+    }
+    if (!paymentMethod) {
+      return { status: false, error: 'Payment method is required.' };
+    }
+    if (!startDate || !endDate) {
+      return { status: false, error: 'Billing period start and end dates are required.' };
+    }
+
+    const requestedStart = new Date(startDate);
+    const requestedEnd = new Date(endDate);
+
+    // Rule 1: Check for pending payouts
+    const pendingPayout = await Payout.findOne({ userId, status: 'Pending' });
+    if (pendingPayout) {
+      return { status: false, error: 'You already have a Pending payout request. Please wait for it to be processed before requesting another.' };
+    }
+
+    // Rule 2: Check for overlapping dates in existing payouts
+    // Overlap condition: existing.startDate <= requestedEnd AND existing.endDate >= requestedStart
+    const overlappingPayout = await Payout.findOne({
+      userId,
+      startDate: { $lte: requestedEnd },
+      endDate: { $gte: requestedStart }
+    });
+
+    if (overlappingPayout) {
+      return { status: false, error: 'The requested billing period overlaps with a previous payout request.' };
+    }
+
+    const totalAmount = sitesBreakdown.reduce((sum, site) => sum + (Number(site.revenue) || 0), 0);
+    if (totalAmount < 100) {
+      return { status: false, error: 'Minimum payout amount is $100.' };
+    }
+
+    const payoutPromises = sitesBreakdown
+      .filter(site => site.revenue > 0)
+      .map(site => {
+        return Payout.create({
+          userId,
+          requestSum: site.revenue,
+          siteId: site.siteId,
+          siteName: site.siteName,
+          paymentMethod,
+          startDate: requestedStart,
+          endDate: requestedEnd,
+          status: 'Pending'
+        });
+      });
+
+    await Promise.all(payoutPromises);
+
+    return { status: true };
+  } catch (err) {
+    console.error("Error in requestPayoutAction:", err.message);
+    return { status: false, error: err.message === 'Unauthorized' ? 'Session expired. Please log in again.' : err.message };
+  }
+}
+
+// Server Action: Get User Payouts
+export async function getUserPayoutsAction() {
+  try {
+    await connectDB();
+    const userId = await getCurrentUserId();
+    
+    const payouts = await Payout.find({ userId }).sort({ createdAt: -1 });
+    
+    const mapped = payouts.map(p => ({
+      id: p._id.toString(),
+      requestSum: p.requestSum,
+      siteName: p.siteName || 'N/A',
+      paymentMethod: p.paymentMethod,
+      status: p.status,
+      startDate: p.startDate,
+      endDate: p.endDate,
+      payoutDate: p.payoutDate,
+      createdAt: p.createdAt
+    }));
+
+    return { status: true, payouts: mapped };
+  } catch (err) {
+    console.error("Error in getUserPayoutsAction:", err.message);
+    return { status: false, error: err.message === 'Unauthorized' ? 'Session expired. Please log in again.' : err.message };
+  }
+}
+
+// Server Action: Get All Payouts (Admin)
+export async function getAllPayoutsAdminAction() {
+  try {
+    await connectDB();
+    const user = await getCurrentUser();
+    
+    if (user.role !== 'admin') {
+      return { status: false, error: 'Unauthorized: Admin access required.' };
+    }
+    
+    const payouts = await Payout.find().populate('userId', 'email').sort({ createdAt: -1 });
+    
+    const mapped = payouts.map(p => ({
+      id: p._id.toString(),
+      userEmail: p.userId?.email || 'Unknown User',
+      requestSum: p.requestSum,
+      siteName: p.siteName || 'N/A',
+      paymentMethod: p.paymentMethod,
+      status: p.status,
+      startDate: p.startDate,
+      endDate: p.endDate,
+      payoutDate: p.payoutDate,
+      createdAt: p.createdAt
+    }));
+
+    return { status: true, payouts: mapped };
+  } catch (err) {
+    console.error("Error in getAllPayoutsAdminAction:", err.message);
+    return { status: false, error: err.message === 'Unauthorized' ? 'Session expired. Please log in again.' : err.message };
+  }
+}
+
+// Server Action: Mark Payout as Paid (Admin)
+export async function markPayoutPaidAction(payoutId) {
+  try {
+    await connectDB();
+    const user = await getCurrentUser();
+    
+    if (user.role !== 'admin') {
+      return { status: false, error: 'Unauthorized: Admin access required.' };
+    }
+    
+    const payout = await Payout.findByIdAndUpdate(
+      payoutId, 
+      { status: 'Paid', payoutDate: new Date() },
+      { new: true }
+    );
+    
+    if (!payout) {
+      return { status: false, error: 'Payout not found.' };
+    }
+
+    return { status: true };
+  } catch (err) {
+    console.error("Error in markPayoutPaidAction:", err.message);
+    return { status: false, error: err.message === 'Unauthorized' ? 'Session expired. Please log in again.' : err.message };
+  }
+}
+
+// Server Action: Calculate total revenue for a date range
+export async function calculateRevenueAction(startDate, endDate) {
+  try {
+    await connectDB();
+    const user = await getCurrentUser();
+    
+    if (!startDate || !endDate) {
+      return { status: false, error: 'Start date and end date are required.' };
+    }
+
+    // Reuse getReportAction which already filters by user sites and applies the 20% cut
+    const reportData = await getReportAction(null, startDate, endDate);
+    
+    if (!reportData || !reportData.data) {
+       return { status: true, totalRevenue: 0, sitesBreakdown: [] };
+    }
+
+    let totalRevenue = 0;
+    let sitesBreakdownMap = {};
+    for (const item of reportData.data) {
+       const rev = Number(item.revenues || item.pub_revenues || 0);
+       totalRevenue += rev;
+       
+       const sName = item.sites_name;
+       if (!sName) continue;
+
+       if (!sitesBreakdownMap[sName]) {
+         // Find siteId from catalog if possible
+         const siteCat = SITE_CATALOG.find(s => s.name === sName);
+         const sId = siteCat ? siteCat.id.toString() : '';
+         sitesBreakdownMap[sName] = { siteId: sId, siteName: sName, revenue: 0 };
+       }
+       sitesBreakdownMap[sName].revenue += rev;
+    }
+
+    return { status: true, totalRevenue, sitesBreakdown: Object.values(sitesBreakdownMap) };
+  } catch (err) {
+    console.error("Error in calculateRevenueAction:", err.message);
     return { status: false, error: err.message === 'Unauthorized' ? 'Session expired. Please log in again.' : err.message };
   }
 }

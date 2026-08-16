@@ -15,6 +15,16 @@ export default function Login() {
   useEffect(() => {
     const token = localStorage.getItem('ureka_token');
     if (token) {
+      try {
+        const payloadStr = atob(token.split('.')[0]);
+        const payload = JSON.parse(payloadStr);
+        if (payload.role === 'admin') {
+          router.push('/admin/payouts');
+          return;
+        }
+      } catch (e) {
+        // ignore
+      }
       router.push('/dashboard');
     }
   }, [router]);
@@ -29,6 +39,16 @@ export default function Login() {
 
       if (res.success) {
         localStorage.setItem('ureka_token', res.token);
+        try {
+          const payloadStr = atob(res.token.split('.')[0]);
+          const payload = JSON.parse(payloadStr);
+          if (payload.role === 'admin') {
+            router.push('/admin/payouts');
+            return;
+          }
+        } catch (e) {
+          // ignore
+        }
         router.push('/dashboard');
       } else {
         setError(res.error);
