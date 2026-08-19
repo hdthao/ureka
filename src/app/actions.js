@@ -248,7 +248,15 @@ export async function getReportAction(token, startDate, endDate) {
 
          // Do not apply cap to storymyst.com or to dates before the cutoff
          if (!isStorymyst && stats.date >= CAP_START_DATE && vrpm > 13) {
-             const cappedVrpm = 12.00 + Math.random() * 0.90;
+             // Use a deterministic hash of the key so the random value is identical across requests
+             let hash = 0;
+             for (let i = 0; i < key.length; i++) {
+               hash = (hash << 5) - hash + key.charCodeAt(i);
+               hash |= 0;
+             }
+             const randomFactor = (Math.abs(hash) % 91) / 100; // 0.00 to 0.90
+
+             const cappedVrpm = 12.00 + randomFactor;
              stats.ratio = cappedVrpm / vrpm;
          }
       });
