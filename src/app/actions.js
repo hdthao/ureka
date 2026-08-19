@@ -182,6 +182,7 @@ export async function getReportAction(token, startDate, endDate) {
       // Sort by pageview descending so that deduplication logic picks the row with actual pageviews first
       response.data.data.sort((a, b) => (Number(b.pageview) || 0) - (Number(a.pageview) || 0));
 
+      // First pass: apply site renames and 20% cuts
       response.data.data = response.data.data.map(item => {
         const modified = { ...item };
 
@@ -216,7 +217,54 @@ export async function getReportAction(token, startDate, endDate) {
             }
           }
         }
+
         return modified;
+      });
+
+      // Second pass: Accumulate revenues and deduplicate pageviews per site-date to find true VRPM
+      const siteDateStats = {};
+      response.data.data.forEach(modified => {
+         const key = `${modified.sites_name}_${modified.date}`;
+         if (!siteDateStats[key]) {
+             siteDateStats[key] = { revenues: 0, pageview: 0, seenPageview: false, ratio: 1, date: modified.date };
+         }
+
+         const currentRev = parseFloat(modified.revenues) || 0;
+         siteDateStats[key].revenues += currentRev;
+
+         if (!siteDateStats[key].seenPageview) {
+             siteDateStats[key].pageview = parseFloat(modified.pageview) || 0;
+             siteDateStats[key].seenPageview = true;
+         }
+      });
+
+      // Third pass: Determine scaling ratio if true VRPM > 13
+      const CAP_START_DATE = '2026-08-20'; // Only apply RPM limits from this date onwards
+
+      Object.keys(siteDateStats).forEach(key => {
+         const stats = siteDateStats[key];
+         const isStorymyst = key.startsWith('storymyst.com');
+         const vrpm = stats.pageview > 0 ? (stats.revenues / stats.pageview) * 1000 : 0;
+
+         // Do not apply cap to storymyst.com or to dates before the cutoff
+         if (!isStorymyst && stats.date >= CAP_START_DATE && vrpm > 13) {
+             const cappedVrpm = 12.00 + Math.random() * 0.90;
+             stats.ratio = cappedVrpm / vrpm;
+         }
+      });
+
+      // Fourth pass: Apply ratio to cap the VRPM
+      response.data.data = response.data.data.map(modified => {
+         const key = `${modified.sites_name}_${modified.date}`;
+         const stats = siteDateStats[key];
+         if (stats && stats.ratio !== 1) {
+             const rev = parseFloat(modified.revenues) || 0;
+             modified.revenues = rev * stats.ratio;
+
+             const rowVrpm = parseFloat(modified.vrpm) || 0;
+             modified.vrpm = rowVrpm * stats.ratio;
+         }
+         return modified;
       });
       response.data.data = filterRecordsBySiteIds(response.data.data, allowedSiteIds);
     }
@@ -545,8 +593,8 @@ export async function getUserProfileAction() {
   try {
     await connectDB();
     const user = await getCurrentUser();
-    return { 
-      status: true, 
+    return {
+      status: true,
       user: {
         email: user.email,
         role: user.role,
@@ -564,7 +612,7 @@ export async function updatePaymentInfoAction(paymentInfo) {
   try {
     await connectDB();
     const userId = await getCurrentUserId();
-    
+
     await User.findByIdAndUpdate(userId, { paymentInfo });
     return { status: true };
   } catch (err) {
@@ -578,7 +626,7 @@ export async function requestPayoutAction(sitesBreakdown, paymentMethod, startDa
   try {
     await connectDB();
     const userId = await getCurrentUserId();
-    
+
     if (!sitesBreakdown || !Array.isArray(sitesBreakdown) || sitesBreakdown.length === 0) {
       return { status: false, error: 'Invalid payout amount or no sites data.' };
     }
@@ -644,9 +692,9 @@ export async function getUserPayoutsAction() {
   try {
     await connectDB();
     const userId = await getCurrentUserId();
-    
+
     const payouts = await Payout.find({ userId }).sort({ createdAt: -1 });
-    
+
     const mapped = payouts.map(p => ({
       id: p._id.toString(),
       requestSum: p.requestSum,
@@ -671,13 +719,13 @@ export async function getAllPayoutsAdminAction() {
   try {
     await connectDB();
     const user = await getCurrentUser();
-    
+
     if (user.role !== 'admin') {
       return { status: false, error: 'Unauthorized: Admin access required.' };
     }
-    
+
     const payouts = await Payout.find().populate('userId', 'email').sort({ createdAt: -1 });
-    
+
     const mapped = payouts.map(p => ({
       id: p._id.toString(),
       userEmail: p.userId?.email || 'Unknown User',
@@ -703,17 +751,17 @@ export async function markPayoutPaidAction(payoutId) {
   try {
     await connectDB();
     const user = await getCurrentUser();
-    
+
     if (user.role !== 'admin') {
       return { status: false, error: 'Unauthorized: Admin access required.' };
     }
-    
+
     const payout = await Payout.findByIdAndUpdate(
-      payoutId, 
+      payoutId,
       { status: 'Paid', payoutDate: new Date() },
       { new: true }
     );
-    
+
     if (!payout) {
       return { status: false, error: 'Payout not found.' };
     }
@@ -730,14 +778,14 @@ export async function calculateRevenueAction(startDate, endDate) {
   try {
     await connectDB();
     const user = await getCurrentUser();
-    
+
     if (!startDate || !endDate) {
       return { status: false, error: 'Start date and end date are required.' };
     }
 
     // Reuse getReportAction which already filters by user sites and applies the 20% cut
     const reportData = await getReportAction(null, startDate, endDate);
-    
+
     if (!reportData || !reportData.data) {
        return { status: true, totalRevenue: 0, sitesBreakdown: [] };
     }
@@ -747,7 +795,7 @@ export async function calculateRevenueAction(startDate, endDate) {
     for (const item of reportData.data) {
        const rev = Number(item.revenues || item.pub_revenues || 0);
        totalRevenue += rev;
-       
+
        const sName = item.sites_name;
        if (!sName) continue;
 
