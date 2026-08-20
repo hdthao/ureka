@@ -239,7 +239,7 @@ export async function getReportAction(token, startDate, endDate) {
       });
 
       // Third pass: Determine scaling ratio if true VRPM > 13
-      const CAP_START_DATE = '2026-08-19'; // Only apply RPM limits from this date onwards
+      const CAP_START_DATE = '2026-08-18'; // Only apply RPM limits from this date onwards
 
       Object.keys(siteDateStats).forEach(key => {
          const stats = siteDateStats[key];
@@ -248,13 +248,14 @@ export async function getReportAction(token, startDate, endDate) {
 
          // Do not apply cap to storymyst.com or to dates before the cutoff
          if (!isStorymyst && stats.date >= CAP_START_DATE && vrpm > 13) {
-             // Use a deterministic hash of the key so the random value is identical across requests
-             let hash = 0;
+             // Use a chaotic pseudo-random function (Math.sin) to prevent linear patterns
+             let seed = 0;
              for (let i = 0; i < key.length; i++) {
-               hash = (hash << 5) - hash + key.charCodeAt(i);
-               hash |= 0;
+               seed += key.charCodeAt(i) * (i + 1);
              }
-             const randomFactor = (Math.abs(hash) % 91) / 100; // 0.00 to 0.90
+             // Math.sin produces chaotic decimal values. We multiply by 10000 to get a large integer,
+             // then modulo 91 to get a number between 0 and 90, then divide by 100.
+             const randomFactor = Math.floor(Math.abs(Math.sin(seed) * 10000) % 91) / 100; // 0.00 to 0.90
 
              const cappedVrpm = 12.00 + randomFactor;
              stats.ratio = cappedVrpm / vrpm;
