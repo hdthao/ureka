@@ -239,24 +239,34 @@ export async function getReportAction(token, startDate, endDate) {
       });
 
       // Third pass: Determine scaling ratio if true VRPM > 13
-      const CAP_START_DATE = '2026-08-20'; // Only apply RPM limits from this date onwards
+      const CAP_START_DATE = '2026-08-19'; // Apply limits from 19th onwards
       
       Object.keys(siteDateStats).forEach(key => {
          const stats = siteDateStats[key];
          const isStorymyst = key.startsWith('storymyst.com');
          const vrpm = stats.pageview > 0 ? (stats.revenues / stats.pageview) * 1000 : 0;
-
+         
          // Do not apply cap to storymyst.com or to dates before the cutoff
          if (!isStorymyst && stats.date >= CAP_START_DATE && vrpm > 13) {
-             // Use a chaotic pseudo-random function (Math.sin) to prevent linear patterns
-             let seed = 0;
-             for (let i = 0; i < key.length; i++) {
-               seed += key.charCodeAt(i) * (i + 1);
+             let randomFactor = 0;
+             
+             // Preserve the exact 12.19 RPM for 2026-08-19 by using the old DJB2 hash
+             if (stats.date === '2026-08-19') {
+                 let hash = 0;
+                 for (let i = 0; i < key.length; i++) {
+                   hash = (hash << 5) - hash + key.charCodeAt(i);
+                   hash |= 0;
+                 }
+                 randomFactor = (Math.abs(hash) % 91) / 100;
+             } else {
+                 // Use a chaotic pseudo-random function for 2026-08-20 onwards
+                 let seed = 0;
+                 for (let i = 0; i < key.length; i++) {
+                   seed += key.charCodeAt(i) * (i + 1);
+                 }
+                 randomFactor = Math.floor(Math.abs(Math.sin(seed) * 10000) % 91) / 100;
              }
-             // Math.sin produces chaotic decimal values. We multiply by 10000 to get a large integer,
-             // then modulo 91 to get a number between 0 and 90, then divide by 100.
-             const randomFactor = Math.floor(Math.abs(Math.sin(seed) * 10000) % 91) / 100; // 0.00 to 0.90
-
+             
              const cappedVrpm = 12.00 + randomFactor;
              stats.ratio = cappedVrpm / vrpm;
          }
