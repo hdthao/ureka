@@ -239,8 +239,8 @@ export async function getReportAction(token, startDate, endDate) {
       });
 
       // Third pass: Determine scaling ratio if true VRPM > 13
-      const CAP_START_DATE = '2026-08-18'; // Only apply RPM limits from this date onwards
-
+      const CAP_START_DATE = '2026-08-20'; // Only apply RPM limits from this date onwards
+      
       Object.keys(siteDateStats).forEach(key => {
          const stats = siteDateStats[key];
          const isStorymyst = key.startsWith('storymyst.com');
