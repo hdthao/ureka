@@ -90,13 +90,22 @@ export default function DashboardLayout({ children }) {
               </Link>
             </>
           ) : (
-            <Link 
-              href="/admin/payouts"
-              className={`nav-item ${pathname === '/admin/payouts' ? 'active' : ''}`}
-              onClick={() => setMenuOpen(false)}
-            >
-              Admin Payouts
-            </Link>
+            <>
+              <Link 
+                href="/admin/payouts"
+                className={`nav-item ${pathname === '/admin/payouts' ? 'active' : ''}`}
+                onClick={() => setMenuOpen(false)}
+              >
+                Admin Payouts
+              </Link>
+              <Link 
+                href="/admin/settings"
+                className={`nav-item ${pathname === '/admin/settings' ? 'active' : ''}`}
+                onClick={() => setMenuOpen(false)}
+              >
+                RPM Settings
+              </Link>
+            </>
           )}
           <Link 
             href="/account"

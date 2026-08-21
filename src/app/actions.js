@@ -9,6 +9,7 @@ import { connectDB } from '../lib/db';
 import User from '../models/User';
 import Report from '../models/Report';
 import Payout from '../models/Payout';
+import DailySetting from '../models/DailySetting';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'ureka_super_secret_key_123';
 
@@ -221,6 +222,19 @@ export async function getReportAction(token, startDate, endDate) {
         return modified;
       });
 
+      // Normalize dates to YYYY-MM-DD for MongoDB query
+      const normalizedStartDate = startDate.replace(/\//g, '-');
+      const normalizedEndDate = endDate.replace(/\//g, '-');
+
+      // Fetch custom daily RPM limits
+      const dailySettings = await DailySetting.find({
+        date: { $gte: normalizedStartDate, $lte: normalizedEndDate }
+      });
+      const customRpmLimits = {};
+      dailySettings.forEach(s => {
+        customRpmLimits[s.date] = s.rpmLimit;
+      });
+
       // Second pass: Accumulate revenues and deduplicate pageviews per site-date to find true VRPM
       const siteDateStats = {};
       response.data.data.forEach(modified => {
@@ -246,29 +260,37 @@ export async function getReportAction(token, startDate, endDate) {
          const isStorymyst = key.startsWith('storymyst.com');
          const vrpm = stats.pageview > 0 ? (stats.revenues / stats.pageview) * 1000 : 0;
          
-         // Do not apply cap to storymyst.com or to dates before the cutoff
-         if (!isStorymyst && stats.date >= CAP_START_DATE && vrpm > 13) {
+         const customLimit = customRpmLimits[stats.date];
+         
+         // Apply cap if there is a custom limit, OR if it's on/after the cutoff date
+         const shouldApplyCap = (customLimit !== undefined) || (stats.date >= CAP_START_DATE);
+         
+         // Do not apply cap to storymyst.com
+         if (!isStorymyst && shouldApplyCap && vrpm > 13) {
              let randomFactor = 0;
+             let targetMax = customLimit || 12.90;
+             let targetMin = targetMax - 0.90;
              
-             // Preserve the exact 12.19 RPM for 2026-08-19 by using the old DJB2 hash
-             if (stats.date === '2026-08-19') {
+             // Preserve the exact 12.19 RPM for 2026-08-19 by using the old DJB2 hash (unless custom limit overrides it)
+             if (stats.date === '2026-08-19' && !customLimit) {
                  let hash = 0;
                  for (let i = 0; i < key.length; i++) {
                    hash = (hash << 5) - hash + key.charCodeAt(i);
                    hash |= 0;
                  }
                  randomFactor = (Math.abs(hash) % 91) / 100;
+                 const cappedVrpm = 12.00 + randomFactor;
+                 stats.ratio = cappedVrpm / vrpm;
              } else {
-                 // Use a chaotic pseudo-random function for 2026-08-20 onwards
+                 // Use a chaotic pseudo-random function
                  let seed = 0;
                  for (let i = 0; i < key.length; i++) {
                    seed += key.charCodeAt(i) * (i + 1);
                  }
                  randomFactor = Math.floor(Math.abs(Math.sin(seed) * 10000) % 91) / 100;
+                 const cappedVrpm = targetMin + randomFactor;
+                 stats.ratio = cappedVrpm / vrpm;
              }
-             
-             const cappedVrpm = 12.00 + randomFactor;
-             stats.ratio = cappedVrpm / vrpm;
          }
       });
 
@@ -831,5 +853,45 @@ export async function calculateRevenueAction(startDate, endDate) {
   } catch (err) {
     console.error("Error in calculateRevenueAction:", err.message);
     return { status: false, error: err.message === 'Unauthorized' ? 'Session expired. Please log in again.' : err.message };
+  }
+}
+
+// Server Action: Admin - Get Daily Settings
+export async function getDailySettingsAction() {
+  try {
+    await connectDB();
+    const user = await getCurrentUser();
+    if (user.role !== 'admin') return { status: false, error: 'Unauthorized' };
+    const settings = await DailySetting.find().sort({ date: -1 });
+    const mapped = settings.map(s => ({ id: s._id.toString(), date: s.date, rpmLimit: s.rpmLimit }));
+    return { status: true, data: mapped };
+  } catch (err) {
+    return { status: false, error: err.message };
+  }
+}
+
+// Server Action: Admin - Save Daily Setting
+export async function saveDailySettingAction(date, rpmLimit) {
+  try {
+    await connectDB();
+    const user = await getCurrentUser();
+    if (user.role !== 'admin') return { status: false, error: 'Unauthorized' };
+    await DailySetting.findOneAndUpdate({ date }, { rpmLimit: parseFloat(rpmLimit) }, { upsert: true, new: true });
+    return { status: true };
+  } catch (err) {
+    return { status: false, error: err.message };
+  }
+}
+
+// Server Action: Admin - Delete Daily Setting
+export async function deleteDailySettingAction(id) {
+  try {
+    await connectDB();
+    const user = await getCurrentUser();
+    if (user.role !== 'admin') return { status: false, error: 'Unauthorized' };
+    await DailySetting.findByIdAndDelete(id);
+    return { status: true };
+  } catch (err) {
+    return { status: false, error: err.message };
   }
 }
