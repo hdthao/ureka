@@ -282,13 +282,19 @@ export async function getReportAction(token, startDate, endDate) {
                  const cappedVrpm = 12.00 + randomFactor;
                  stats.ratio = cappedVrpm / vrpm;
              } else {
-                 // Use a chaotic pseudo-random function
-                 let seed = 0;
-                 for (let i = 0; i < key.length; i++) {
-                   seed += key.charCodeAt(i) * (i + 1);
+                 let cappedVrpm;
+                 if (customLimit !== undefined) {
+                     // If Admin set a custom limit, use the EXACT number (no randomization)
+                     cappedVrpm = customLimit;
+                 } else {
+                     // Otherwise, use a chaotic pseudo-random function
+                     let seed = 0;
+                     for (let i = 0; i < key.length; i++) {
+                       seed += key.charCodeAt(i) * (i + 1);
+                     }
+                     randomFactor = Math.floor(Math.abs(Math.sin(seed) * 10000) % 91) / 100;
+                     cappedVrpm = targetMin + randomFactor;
                  }
-                 randomFactor = Math.floor(Math.abs(Math.sin(seed) * 10000) % 91) / 100;
-                 const cappedVrpm = targetMin + randomFactor;
                  stats.ratio = cappedVrpm / vrpm;
              }
          }

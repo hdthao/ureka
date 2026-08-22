@@ -61,12 +61,12 @@ export default function AdminSettingsPage() {
 
       <div className="dashboard-card" style={{ maxWidth: '800px', margin: '0 auto', padding: '24px' }}>
         <h2 style={{ fontSize: '1.2rem', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          Daily RPM Limits
+          Daily RPM Settings
         </h2>
         
         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px', background: 'var(--color-bg-body)', padding: '24px', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--color-text-primary)' }}>Set RPM Limit for Today</h3>
+            <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--color-text-primary)' }}>Set Exact Target RPM for Today</h3>
             <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
               This setting will take effect immediately for data generated on: <strong style={{ color: 'var(--color-accent)' }}>{todayStr}</strong>
             </p>
@@ -74,7 +74,7 @@ export default function AdminSettingsPage() {
           
           <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
             <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '6px', fontWeight: 500 }}>Target Max RPM Limit</label>
+              <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '6px', fontWeight: 500 }}>Exact Target RPM</label>
               <input 
                 type="number" 
                 step="0.01"
@@ -146,7 +146,7 @@ export default function AdminSettingsPage() {
               <thead>
                 <tr>
                   <th>Date</th>
-                  <th>Target Max RPM</th>
+                  <th>Target RPM</th>
                   <th style={{ width: '80px', textAlign: 'center' }}>Actions</th>
                 </tr>
               </thead>
