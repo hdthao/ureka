@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle, Info, Loader2 } from 'lucide-react';
-import { getAllPayoutsAdminAction, markPayoutPaidAction, getUserProfileAction } from '../../../actions';
+import { CheckCircle, Info, Loader2, PlusCircle, Users, ChevronDown } from 'lucide-react';
+import { getAllPayoutsAdminAction, markPayoutPaidAction, getUserProfileAction, getAllUsersAdminAction, calculateUserRevenueAdminAction, adminCreatePayoutAction } from '../../../actions';
 
 export default function AdminPayoutsPage() {
   const [loading, setLoading] = useState(true);
@@ -11,6 +11,17 @@ export default function AdminPayoutsPage() {
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
   const [payouts, setPayouts] = useState([]);
+  
+  // Create Payout State
+  const [users, setUsers] = useState([]);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [calculating, setCalculating] = useState(false);
+  const [requestSum, setRequestSum] = useState('');
+  const [sitesBreakdown, setSitesBreakdown] = useState([]);
+  const [creating, setCreating] = useState(false);
 
   const router = useRouter();
 
@@ -30,10 +41,16 @@ export default function AdminPayoutsPage() {
         return;
       }
 
-      const payoutsRes = await getAllPayoutsAdminAction();
+      const [payoutsRes, usersRes] = await Promise.all([
+        getAllPayoutsAdminAction(),
+        getAllUsersAdminAction()
+      ]);
+
       if (!payoutsRes.status) throw new Error(payoutsRes.error || 'Failed to fetch payouts');
+      if (!usersRes.status) throw new Error(usersRes.error || 'Failed to fetch users');
 
       setPayouts(payoutsRes.payouts || []);
+      setUsers(usersRes.users || []);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -59,6 +76,90 @@ export default function AdminPayoutsPage() {
       setError(err.message);
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleCalculateRevenue = async () => {
+    if (!selectedUserId) {
+      setError("Please select a user.");
+      return;
+    }
+    if (!startDate || !endDate) {
+      setError("Please select both start and end dates.");
+      return;
+    }
+    if (new Date(startDate) > new Date(endDate)) {
+      setError("Start date cannot be later than end date.");
+      return;
+    }
+    
+    setCalculating(true);
+    setError(null);
+    try {
+       const res = await calculateUserRevenueAdminAction(selectedUserId, startDate, endDate);
+       if (res.status) {
+         setRequestSum(res.totalRevenue.toFixed(2));
+         setSitesBreakdown(res.sitesBreakdown || []);
+       } else {
+         throw new Error(res.error || "Failed to calculate revenue.");
+       }
+    } catch (e) {
+       setError(e.message);
+    } finally {
+       setCalculating(false);
+    }
+  };
+
+  const handleCreatePayout = async (e) => {
+    e.preventDefault();
+    try {
+      if (!selectedUserId) throw new Error('Please select a user.');
+      
+      const amount = parseFloat(requestSum);
+      if (isNaN(amount) || amount <= 0) {
+        throw new Error('Please enter a valid payout amount or select a valid date range.');
+      }
+
+      setCreating(true);
+      setError(null);
+      setSuccessMsg(null);
+
+      // Proportionally adjust sitesBreakdown if amount was edited
+      let adjustedBreakdown = [...sitesBreakdown];
+      const originalTotal = sitesBreakdown.reduce((sum, site) => sum + site.revenue, 0);
+      
+      if (originalTotal > 0 && Math.abs(amount - originalTotal) > 0.01) {
+        const ratio = amount / originalTotal;
+        adjustedBreakdown = sitesBreakdown.map(site => ({
+          ...site,
+          revenue: site.revenue * ratio
+        }));
+      } else if (originalTotal === 0 && amount > 0) {
+        // Fallback: If admin overrides amount but there are no sites in the period,
+        // we fake a generic site entry so the backend doesn't fail.
+        adjustedBreakdown = [{
+          siteId: 'manual',
+          siteName: 'Manual Adjustment',
+          revenue: amount
+        }];
+      }
+
+      const res = await adminCreatePayoutAction(selectedUserId, adjustedBreakdown, startDate, endDate);
+      if (!res.status) throw new Error(res.error || 'Failed to create payout');
+
+      setSuccessMsg('Payout created and sent successfully.');
+      setRequestSum('');
+      setStartDate('');
+      setEndDate('');
+      setSelectedUserId('');
+      setTimeout(() => setSuccessMsg(null), 3000);
+      
+      // Refresh payouts list
+      await fetchData();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -88,6 +189,152 @@ export default function AdminPayoutsPage() {
         </div>
       ) : (
         <div className="bottom-grid" style={{ gridTemplateColumns: '1fr', gap: '24px' }}>
+          
+          {/* Create Payout Section */}
+          <div className="chart-section" style={{ padding: '24px', background: 'white' }}>
+            <div className="chart-header" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <PlusCircle size={18} /> Create & Send Payout
+            </div>
+            <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '16px' }}>
+              Calculate revenue for a user and create a payout record for them.
+            </p>
+            <form onSubmit={handleCreatePayout} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Select User</label>
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <div 
+                    onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                    style={{ padding: '10px 12px 10px 36px', border: '1px solid #ddd', borderRadius: '4px', width: '100%', backgroundColor: '#f8f9fa', cursor: 'pointer', minHeight: '41px', display: 'flex', alignItems: 'center' }}
+                  >
+                    <Users size={16} color="#666" style={{ position: 'absolute', left: '12px' }} />
+                    {selectedUserId ? (
+                      <span style={{ fontSize: '0.95rem' }}>
+                        <strong style={{ color: '#0277bd', marginRight: '6px' }}>[{users.find(u => u.id === selectedUserId)?.sites}]</strong>
+                        {users.find(u => u.id === selectedUserId)?.email}
+                      </span>
+                    ) : (
+                      <span style={{ color: '#666' }}>-- Select a User --</span>
+                    )}
+                    <ChevronDown size={16} color="#666" style={{ position: 'absolute', right: '12px' }} />
+                  </div>
+
+                  {isUserDropdownOpen && (
+                    <>
+                      <div 
+                        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9 }} 
+                        onClick={() => setIsUserDropdownOpen(false)} 
+                      />
+                      <div style={{ 
+                        position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, 
+                        backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '4px', 
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 10,
+                        maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column'
+                      }}>
+                        {users.map(u => (
+                          <div 
+                            key={u.id}
+                            onClick={() => { setSelectedUserId(u.id); setRequestSum(''); setIsUserDropdownOpen(false); }}
+                            style={{ 
+                              padding: '12px 16px', cursor: 'pointer', fontSize: '0.95rem',
+                              backgroundColor: selectedUserId === u.id ? '#f0f7ff' : 'transparent',
+                              borderBottom: '1px solid #eee'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.backgroundColor = selectedUserId === u.id ? '#f0f7ff' : '#f5f5f5'}
+                            onMouseOut={e => e.currentTarget.style.backgroundColor = selectedUserId === u.id ? '#f0f7ff' : 'transparent'}
+                          >
+                            <strong style={{ color: '#0277bd', marginRight: '6px' }}>[{u.sites}]</strong> 
+                            <span style={{ color: '#333' }}>{u.email}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Start Date</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => { setStartDate(e.target.value); setRequestSum(''); }}
+                    style={{ padding: '10px 12px', border: '1px solid #ddd', borderRadius: '4px', width: '100%' }}
+                  />
+                </div>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>End Date</label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => { setEndDate(e.target.value); setRequestSum(''); }}
+                    style={{ padding: '10px 12px', border: '1px solid #ddd', borderRadius: '4px', width: '100%' }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCalculateRevenue}
+                  disabled={calculating || !selectedUserId}
+                  style={{
+                    padding: '10px 16px', background: 'var(--color-accent)', color: 'white', border: 'none',
+                    borderRadius: '4px', cursor: (calculating || !selectedUserId) ? 'not-allowed' : 'pointer', fontWeight: 600, display: 'inline-flex',
+                    alignItems: 'center', justifyContent: 'center', gap: '8px', height: '41px', whiteSpace: 'nowrap'
+                  }}
+                >
+                  {calculating ? <Loader2 size={16} className="animate-spin" /> : 'Calculate'}
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  Calculated Payout Amount
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: '16px', fontSize: '1.2rem', fontWeight: 700, color: '#333', zIndex: 1 }}>$</span>
+                  <input 
+                    type="number"
+                    step="0.01"
+                    value={requestSum}
+                    onChange={(e) => setRequestSum(e.target.value)}
+                    disabled={calculating}
+                    style={{ 
+                      padding: '12px 16px 12px 32px', border: '1px solid #ddd', borderRadius: '4px', 
+                      backgroundColor: 'white', minHeight: '46px', width: '100%', 
+                      fontSize: '1.2rem', fontWeight: 700, color: (requestSum && Number(requestSum) > 0) ? '#2e7d32' : '#333' 
+                    }}
+                    placeholder={calculating ? 'Calculating...' : '0.00'}
+                  />
+                </div>
+              </div>
+              
+              <button
+                type="submit"
+                disabled={creating || !selectedUserId || !requestSum || Number(requestSum) <= 0}
+                style={{
+                  padding: '12px 20px', 
+                  background: (selectedUserId && requestSum && Number(requestSum) > 0) ? '#10b981' : '#f1f5f9', 
+                  color: (selectedUserId && requestSum && Number(requestSum) > 0) ? 'white' : '#94a3b8', 
+                  border: (selectedUserId && requestSum && Number(requestSum) > 0) ? 'none' : '1px solid #e2e8f0',
+                  borderRadius: '6px', 
+                  cursor: (selectedUserId && requestSum && Number(requestSum) > 0) ? 'pointer' : 'not-allowed', 
+                  fontWeight: 600, 
+                  display: 'inline-flex',
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '8px', 
+                  alignSelf: 'flex-start',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                {creating ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+                Create & Send Payout
+              </button>
+            </form>
+          </div>
+
+          <div className="page-title" style={{ marginTop: '16px' }}>All Payouts History</div>
+
           {payouts.length === 0 ? (
             <div className="chart-section" style={{ padding: '32px', textAlign: 'center', color: '#888' }}>
               No payouts found.
