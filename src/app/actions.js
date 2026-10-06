@@ -16,7 +16,8 @@ const JWT_SECRET = process.env.JWT_SECRET || 'ureka_super_secret_key_123';
 const SITE_CATALOG = [
   { id: 106083, name: 'news.pioneerindiya.com' },
   { id: 106095, name: 'feel.pioneerindiya.com' },
-  { id: 106096, name: 'storymyst.com' }
+  { id: 106096, name: 'storymyst.com' },
+  { id: 106097, name: 'story1.pioneerindiya.com' }
 ];
 
 const SITE_NAME_BY_ID = SITE_CATALOG.reduce((map, site) => {
@@ -86,8 +87,8 @@ async function getCurrentUser() {
 }
 
 function getAllowedSiteIds(user) {
-  const validSiteIds = new Set(SITE_CATALOG.map(site => site.id));
-  return (user.allowedSites || []).filter(siteId => validSiteIds.has(siteId));
+  const validSiteIds = new Set(SITE_CATALOG.map(site => Number(site.id)));
+  return (user.allowedSites || []).map(Number).filter(siteId => validSiteIds.has(siteId));
 }
 
 function sanitizeReportFilters(filters, allowedSiteIds) {
@@ -199,22 +200,29 @@ export async function getReportAction(token, startDate, endDate, userIdOverride 
           }
         }
 
-        // Do not cut 20% for storymyst.com
-        if (modified.sites_name !== 'storymyst.com') {
+        // Apply revenue cut based on site
+        let multiplier = 0.8; // Default 20% cut
+        if (modified.sites_name === 'storymyst.com') {
+          multiplier = 1.0; // 0% cut
+        } else if (modified.sites_name === 'story1.pioneerindiya.com') {
+          multiplier = 0.85; // 15% cut
+        }
+
+        if (multiplier !== 1.0) {
           if (typeof modified.revenues === 'number') {
-            modified.revenues = modified.revenues * 0.8;
+            modified.revenues = modified.revenues * multiplier;
           } else if (typeof modified.revenues === 'string') {
             const num = parseFloat(modified.revenues);
             if (!isNaN(num)) {
-              modified.revenues = num * 0.8;
+              modified.revenues = num * multiplier;
             }
           }
           if (typeof modified.vrpm === 'number') {
-            modified.vrpm = modified.vrpm * 0.8;
+            modified.vrpm = modified.vrpm * multiplier;
           } else if (typeof modified.vrpm === 'string') {
             const num = parseFloat(modified.vrpm);
             if (!isNaN(num)) {
-              modified.vrpm = num * 0.8;
+              modified.vrpm = num * multiplier;
             }
           }
         }
@@ -753,7 +761,7 @@ export async function getAllUsersAdminAction() {
     const users = await User.find({ role: 'user' }).select('_id email paymentInfo allowedSites').sort({ email: 1 });
     const mapped = users.map(u => {
       const siteNames = (u.allowedSites || []).map(id => {
-        const site = SITE_CATALOG.find(s => s.id === id);
+        const site = SITE_CATALOG.find(s => Number(s.id) === Number(id));
         return site ? site.name : id;
       });
       return {
